@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import { GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { currency, daysBetween, percent } from "@/lib/utils";
 
 export function PipelineBoard({ data }: { data: CrmData }) {
   const [merchants, setMerchants] = useState(data.merchants);
+  const [isMounted, setIsMounted] = useState(false);
   const [, startTransition] = useTransition();
 
   const agentNames = useMemo(
@@ -40,6 +41,10 @@ export function PipelineBoard({ data }: { data: CrmData }) {
     startTransition(() => void updateMerchantStatusAction(merchantId, stage));
   }
 
+  useEffect(() => {
+    queueMicrotask(() => setIsMounted(true));
+  }, []);
+
   return (
     <section id="leads-pipeline">
       <Card>
@@ -53,20 +58,51 @@ export function PipelineBoard({ data }: { data: CrmData }) {
           </div>
         </CardHeader>
         <CardContent>
-          <DndContext onDragEnd={handleDragEnd}>
-            <div className="grid gap-4 overflow-x-auto pb-2 xl:grid-cols-3 2xl:grid-cols-5">
-              {pipelineStages.map((stage) => {
-                const stageMerchants = merchants.filter((merchant) => merchant.status === stage.id);
+          {isMounted ? (
+            <DndContext onDragEnd={handleDragEnd}>
+              <div className="grid gap-4 overflow-x-auto pb-2 xl:grid-cols-3 2xl:grid-cols-5">
+                {pipelineStages.map((stage) => {
+                  const stageMerchants = merchants.filter((merchant) => merchant.status === stage.id);
 
-                return (
-                  <StageColumn key={stage.id} id={stage.id} title={stage.label} merchants={stageMerchants} agentNames={agentNames} />
-                );
-              })}
-            </div>
-          </DndContext>
+                  return (
+                    <StageColumn key={stage.id} id={stage.id} title={stage.label} merchants={stageMerchants} agentNames={agentNames} />
+                  );
+                })}
+              </div>
+            </DndContext>
+          ) : (
+            <StaticPipeline merchants={merchants} agentNames={agentNames} />
+          )}
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function StaticPipeline({ merchants, agentNames }: { merchants: Merchant[]; agentNames: Map<string, string> }) {
+  return (
+    <div className="grid gap-4 overflow-x-auto pb-2 xl:grid-cols-3 2xl:grid-cols-5">
+      {pipelineStages.map((stage) => {
+        const stageMerchants = merchants.filter((merchant) => merchant.status === stage.id);
+
+        return (
+          <div key={stage.id} className="min-h-56 min-w-72 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{stage.label}</h3>
+              <Badge>{stageMerchants.length}</Badge>
+            </div>
+            <div className="space-y-3">
+              {stageMerchants.map((merchant) => (
+                <article key={merchant.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                  <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{merchant.business_name}</p>
+                  <p className="mt-1 text-xs text-slate-500">{agentNames.get(merchant.assigned_agent_id) ?? "Unassigned"}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
