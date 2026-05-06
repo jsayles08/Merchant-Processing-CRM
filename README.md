@@ -1,135 +1,137 @@
 # CVEST CRM
 
-Internal CRM for CVEST agents and managers — merchant onboarding, deal pipeline,
-residual tracking, team overrides, and an AI Copilot.
+Production-minded internal CRM for CVEST, a fintech merchant processing company. The app is built for agents, managers, and admins to manage merchant acquisition, onboarding, residual tracking, team growth, and AI-assisted follow-up.
 
-**Stack**: Next.js 15 (App Router) · TypeScript · Tailwind · shadcn-style UI ·
-Supabase (auth + Postgres + RLS) · OpenAI · Vitest.
+## Stack
 
-## Quick start
+- Next.js App Router, TypeScript, Tailwind CSS
+- Supabase Auth, Postgres, Storage, and RLS
+- OpenAI API for Agent Copilot
+- Recharts dashboards
+- TanStack Table merchant book
+- dnd-kit pipeline foundation
+
+## Implemented
+
+- Protected Supabase auth flow with role-backed profiles
+- Server-rendered CRM data behind Supabase RLS
+- Dashboard with volume, residual, payout, forecast, agent, and recommendation cards
+- Merchant CRUD workflow with Supabase server actions and pricing-floor flags
+- Merchant detail routes with update timelines, automatic follow-up task creation, and document upload
+- Kanban-style pipeline board with persisted stage changes
+- Manager/admin pricing approval queue
+- Compensation utilities for 40% personal residual, recruit activation, team override cap, monthly income, and annualized estimate
+- Agent Copilot with persisted messages/actions and confirmation endpoint for major writes
+- Weekly performance summary job endpoint and database function
+- Notifications table foundation
+- Dark/light mode-ready visual system
+
+## Getting Started
 
 ```bash
 npm install
-cp .env.example .env.local      # fill in values, see below
-npm run dev                     # http://localhost:3000
+cp .env.example .env.local
+npm run dev
 ```
 
-The app **runs without Supabase or OpenAI** for demo browsing — it falls back
-to in-memory seed data and a stub Copilot reply. Add the env vars when you're
-ready to connect real services.
+Open `http://localhost:3000`.
 
-### Environment variables
+The production app requires Supabase environment variables. Without them, it redirects to `/setup`.
 
-See `.env.example`. You need:
+## Environment Variables
 
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase
-  project (create one at <https://supabase.com>, then Project Settings → API).
-- `SUPABASE_SERVICE_ROLE_KEY` — for admin tasks if you add them.
-- `OPENAI_API_KEY` — for the Copilot route. Optional `OPENAI_MODEL`
-  (default `gpt-4o-mini`).
-
-## Database setup (Supabase)
-
-In the Supabase SQL editor, run **in order**:
-
-1. `supabase/schema.sql` — tables, enums, triggers.
-2. `supabase/policies.sql` — row-level security.
-3. `supabase/seed.sql` — demo merchants/agents/deals (optional).
-
-The `handle_new_user` trigger auto-creates a `profiles` row when someone signs
-up via Supabase Auth.
-
-## Scripts
-
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Next.js dev server |
-| `npm run build` | Production build |
-| `npm run start` | Run production build |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Vitest (compensation logic) |
-| `npm run test:watch` | Vitest in watch mode |
-
-## Project layout
-
-```
-app/
-  (app)/                 routes that share the sidebar shell
-    dashboard/           overview KPIs + recent activity
-    merchants/           list, [id] detail, new/ form
-    pipeline/            kanban-style deal board
-    copilot/             AI chat for plain-English updates
-    tasks/               follow-ups
-    compensation/        residuals + override math + what-if calculator
-    teams/               sponsor → recruits structure
-    documents/           (stub) Supabase Storage hookup goes here
-    reports/             top agents, monthly net residual
-    admin/               people, comp defaults
-  api/copilot/route.ts   OpenAI chat endpoint
-  login/                 sign-in
-components/              shadcn-style UI + app primitives
-lib/
-  compensation.ts        the business-critical math (with tests)
-  data.ts                server-side data access (Supabase or demo)
-  demo-data.ts           in-memory fallback fixtures
-  supabase/{client,server,middleware}.ts
-  types.ts               domain TypeScript types
-supabase/
-  schema.sql             tables, enums, triggers
-  policies.sql           row-level security
-  seed.sql               demo data
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.2
+CRON_SECRET=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-## Compensation rules (canonical)
+`OPENAI_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are server-only and must never be exposed in client components.
 
-These are implemented in [`lib/compensation.ts`](lib/compensation.ts) and
-verified by [`lib/compensation.test.ts`](lib/compensation.test.ts):
+## Supabase Setup
 
-- Each agent earns **40%** of net residual on personally signed merchants.
-- Net residual is modeled as `volume × rate% × 0.30 margin` for the MVP. Plug
-  in real residual statements later.
-- Proposed rate **< 1.50%** auto-flags the deal for management approval. There
-  is also a Postgres trigger (`tg_deal_flag_below_floor`) enforcing this on
-  the database side.
-- A recruit becomes **active** with **2+ verified merchants processing 90+
-  consecutive days**.
-- Each active recruit adds **0.25%** override, capped at **1.00% per team**.
-- Teams are **sponsor + 4 direct recruits**. Excess starts a new team.
-- Overrides are **one level deep** and never reduce the recruit's 40%.
-- There is **no global cap** — each team computes separately.
+Run these files in order in Supabase SQL editor or through the CLI:
 
-## Demo accounts
+```bash
+supabase/schema.sql
+supabase/rls.sql
+supabase/seed.sql
+```
 
-The seed creates these (only as `profiles` rows; create the matching auth
-users in Supabase Auth → Users to actually sign in):
+The schema includes:
 
-| Email | Role |
-| --- | --- |
-| admin@cvest.demo | admin |
-| mgr@cvest.demo | manager |
-| agent1@cvest.demo … agent3@cvest.demo | agent |
+- `profiles`, `agents`, `merchants`, `merchant_updates`, `deals`, `tasks`, `documents`
+- `residuals`, `teams`, `team_members`, `compensation_rules`
+- `copilot_messages`, `copilot_actions`
+- `agent_performance_summaries`, `notifications`
+- public Supabase Storage bucket `merchant-documents`
 
-## Build order — what's done vs. what's stubbed
+Automation triggers include:
 
-Implemented:
-- Project + config (Next 15, TS, Tailwind, shadcn primitives, theme)
-- Schema + RLS + seed
-- Auth flow (email/password)
-- Dashboard with KPIs + recent merchants + stale leads
-- Merchants CRUD: list, detail, new (with below-floor approval banner)
-- Pipeline kanban (read-only — drag-and-drop is a follow-up)
-- Tasks list
-- Compensation page + override math + what-if calculator
-- Teams page (sponsor → recruits with active/pending state)
-- Reports (top agents, monthly net residual)
-- Admin (people + comp defaults read-only)
-- Copilot API + chat UI
+- pricing approvals when proposed rate is below the rule floor
+- merchant/deal `updated_at`
+- follow-up task creation from merchant updates
+- recruit active status refresh when merchant verification changes
 
-Stubbed for the next pass:
-- Documents page — needs a Supabase Storage bucket + upload action.
-- Pipeline drag-and-drop — currently you change stage from the merchant page.
-- Manager-side approval queue UI (data is there; needs a dedicated page).
-- Copilot **tool calling** — current Copilot replies in plain English. Next
-  iteration: pass tools (create_merchant, add_update, move_stage, create_task)
-  and execute them via server actions with a confirmation step.
+## Auth And Roles
+
+This app intentionally does not offer open self-signup. Create users in Supabase Auth, then attach them to `profiles.user_id` with one of these roles:
+
+- `admin`
+- `manager`
+- `agent`
+
+Agents must also have a matching `agents.profile_id` record before they can own merchants or create merchant updates.
+
+## Copilot Confirmation
+
+`/api/copilot` persists every user and assistant message to Supabase. Suggested write actions are stored in `copilot_actions` with `requires_confirmation`.
+
+Confirmed actions are applied through:
+
+```bash
+POST /api/copilot/actions/:id/confirm
+```
+
+Currently supported confirmed writes:
+
+- create task
+- add merchant timeline update
+- update merchant/deal stage
+
+## Weekly Summary Job
+
+The secured route below calls the Postgres summary function and creates notifications:
+
+```bash
+POST /api/jobs/weekly-summary
+Authorization: Bearer $CRON_SECRET
+```
+
+Use Vercel Cron, Supabase scheduled functions, GitHub Actions, or another scheduler to call it weekly.
+
+## Credentials Needed For Live Connection
+
+When you are ready to connect the real services, I need:
+
+- Supabase project URL
+- Supabase anon public key
+- Supabase service role key
+- OpenAI API key
+- Preferred production app URL
+- A long random `CRON_SECRET`
+- The first admin user's Supabase Auth email or user ID so we can attach the admin profile
+
+## Compensation Rules
+
+- Agents earn 40% of net residual on personally signed merchants
+- Proposed processing rate below 1.50% requires management approval
+- A recruit is active after 2 verified merchants process for 90+ days
+- Each active direct recruit adds 0.25% override
+- Team override caps at 1.00% per team
+- Teams are the agent plus 4 direct recruits
+- Overrides are one level deep and never reduce the recruited agent's 40% residual
