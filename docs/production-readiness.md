@@ -22,12 +22,13 @@ This checklist tracks the next work needed to operate MR CRM as a platform produ
   - `https://your-domain.com/auth/callback`
   - `https://your-domain.com/reset-password`
 - Enable Vercel Cron or another scheduler to call:
-  - `POST /api/jobs/weekly-summary`
+  - `GET or POST /api/jobs/weekly-summary`
   - header `Authorization: Bearer $CRON_SECRET`
+  - `vercel.json` registers the production cron for Monday at 13:00 UTC.
 
 ## Next Product Work
 
-- Replace public document URLs with signed URLs if merchant files contain sensitive data.
+- Confirm existing merchant documents have been migrated from old public URLs to private storage paths.
 - Add audit logs for merchant edits, pricing approvals, user creation, and Copilot-confirmed actions.
 - Add manager assignment workflows and bulk reassignment.
 - Add residual import from processor reports.

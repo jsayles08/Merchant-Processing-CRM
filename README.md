@@ -76,7 +76,7 @@ The schema includes:
 - `residuals`, `teams`, `team_members`, `compensation_rules`
 - `copilot_messages`, `copilot_actions`
 - `agent_performance_summaries`, `notifications`
-- public Supabase Storage bucket `merchant-documents`
+- private Supabase Storage bucket `merchant-documents` with signed document links
 
 Automation triggers include:
 
@@ -116,11 +116,11 @@ Currently supported confirmed writes:
 The secured route below calls the Postgres summary function and creates notifications:
 
 ```bash
-POST /api/jobs/weekly-summary
+GET or POST /api/jobs/weekly-summary
 Authorization: Bearer $CRON_SECRET
 ```
 
-Use Vercel Cron, Supabase scheduled functions, GitHub Actions, or another scheduler to call it weekly.
+`vercel.json` registers a Vercel Cron job for Monday at 13:00 UTC. Vercel sends `CRON_SECRET` in the `Authorization` header when that environment variable is configured for the project.
 
 ## Health Check
 

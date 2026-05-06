@@ -419,8 +419,12 @@ end;
 $$;
 
 insert into storage.buckets (id, name, public)
-values ('merchant-documents', 'merchant-documents', true)
+values ('merchant-documents', 'merchant-documents', false)
 on conflict (id) do nothing;
+
+update storage.buckets
+set public = false
+where id = 'merchant-documents';
 
 insert into compensation_rules (rule_name)
 values ('MR CRM Standard Agent Plan')

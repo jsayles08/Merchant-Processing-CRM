@@ -197,12 +197,11 @@ export async function uploadMerchantDocumentAction(formData: FormData): Promise<
 
   if (uploadError) return { ok: false, message: uploadError.message };
 
-  const { data: publicUrl } = supabase.storage.from("merchant-documents").getPublicUrl(path);
   const { error: documentError } = await supabase.from("documents").insert({
     merchant_id: merchantId,
     uploaded_by: profile.id,
     file_name: file.name,
-    file_url: publicUrl.publicUrl,
+    file_url: path,
     document_type: documentType,
   });
 

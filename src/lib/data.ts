@@ -99,7 +99,7 @@ export async function getMerchantDetailData(
     assignedProfile,
     updates,
     tasks,
-    documents,
+    documents: await signMerchantDocuments(supabase, documents),
     residuals,
   };
 }
@@ -137,4 +137,24 @@ async function maybeSingle<T>(
   const { data, error } = await supabase.from(table).select("*").eq(column, value).maybeSingle<T>();
   if (error) throw error;
   return data ?? null;
+}
+
+async function signMerchantDocuments(supabase: SupabaseClient, documents: Document[]): Promise<Document[]> {
+  return Promise.all(
+    documents.map(async (document) => {
+      if (document.file_url.startsWith("http") || document.file_url.startsWith("/")) {
+        return document;
+      }
+
+      const { data, error } = await supabase.storage
+        .from("merchant-documents")
+        .createSignedUrl(document.file_url, 60 * 10);
+
+      if (error || !data?.signedUrl) {
+        return document;
+      }
+
+      return { ...document, file_url: data.signedUrl };
+    }),
+  );
 }
