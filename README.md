@@ -47,7 +47,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.2
 CRON_SECRET=
-NEXT_PUBLIC_APP_URL
+NEXT_PUBLIC_APP_URL=
 ```
 
 `OPENAI_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are server-only and must never be exposed in client components.
