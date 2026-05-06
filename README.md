@@ -1,6 +1,6 @@
-# CVEST CRM
+# MR CRM
 
-Production-minded internal CRM for CVEST, a fintech merchant processing company. The app is built for agents, managers, and admins to manage merchant acquisition, onboarding, residual tracking, team growth, and AI-assisted follow-up.
+Production-minded merchant processing CRM for agents, managers, and admins to manage merchant acquisition, onboarding, residual tracking, team growth, and AI-assisted follow-up. The visible brand can be configured per company through public environment variables.
 
 ## Stack
 
@@ -52,6 +52,10 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.2
 CRON_SECRET=
 NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_COMPANY_NAME=
+NEXT_PUBLIC_PRODUCT_NAME=
+NEXT_PUBLIC_COMPANY_INITIALS=
+NEXT_PUBLIC_SUPPORT_EMAIL=
 ```
 
 `OPENAI_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are server-only and must never be exposed in client components.
@@ -72,7 +76,7 @@ The schema includes:
 - `residuals`, `teams`, `team_members`, `compensation_rules`
 - `copilot_messages`, `copilot_actions`
 - `agent_performance_summaries`, `notifications`
-- public Supabase Storage bucket `merchant-documents`
+- private Supabase Storage bucket `merchant-documents` with signed document links
 
 Automation triggers include:
 
@@ -112,11 +116,11 @@ Currently supported confirmed writes:
 The secured route below calls the Postgres summary function and creates notifications:
 
 ```bash
-POST /api/jobs/weekly-summary
+GET or POST /api/jobs/weekly-summary
 Authorization: Bearer $CRON_SECRET
 ```
 
-Use Vercel Cron, Supabase scheduled functions, GitHub Actions, or another scheduler to call it weekly.
+`vercel.json` registers a Vercel Cron job for Monday at 13:00 UTC. Vercel sends `CRON_SECRET` in the `Authorization` header when that environment variable is configured for the project.
 
 ## Health Check
 

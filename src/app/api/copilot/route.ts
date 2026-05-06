@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionContext } from "@/lib/auth";
+import { brand } from "@/lib/branding";
 import { isOpenAIConfigured } from "@/lib/env";
 
 const RequestSchema = z.object({
@@ -86,7 +87,7 @@ async function buildOpenAIResponse(message: string, merchants: unknown[]) {
       {
         role: "system",
         content:
-          "You are CVEST Agent Copilot for a merchant processing CRM. Extract likely CRM actions, missing fields, risks, and next best action. Major writes such as creating records, moving stages, creating tasks, or updating merchant data must require confirmation. Return concise JSON.",
+          `You are ${brand.companyName} Agent Copilot for a merchant processing CRM. Extract likely CRM actions, missing fields, risks, and next best action. Major writes such as creating records, moving stages, creating tasks, or updating merchant data must require confirmation. Return concise JSON.`,
       },
       {
         role: "user",

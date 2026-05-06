@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSessionContext } from "@/lib/auth";
+import { brand } from "@/lib/branding";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { MerchantStatus, TaskStatus } from "@/lib/types";
+import type { MerchantStatus, Task, TaskStatus } from "@/lib/types";
 
 export type ActionResult = {
   ok: boolean;
@@ -196,12 +197,11 @@ export async function uploadMerchantDocumentAction(formData: FormData): Promise<
 
   if (uploadError) return { ok: false, message: uploadError.message };
 
-  const { data: publicUrl } = supabase.storage.from("merchant-documents").getPublicUrl(path);
   const { error: documentError } = await supabase.from("documents").insert({
     merchant_id: merchantId,
     uploaded_by: profile.id,
     file_name: file.name,
-    file_url: publicUrl.publicUrl,
+    file_url: path,
     document_type: documentType,
   });
 
@@ -326,7 +326,7 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
   }
 
   revalidatePath("/");
-  return { ok: true, message: `${parsed.data.full_name} is ready to use CVEST CRM.` };
+  return { ok: true, message: `${parsed.data.full_name} is ready to use ${brand.companyName}.` };
 }
 
 export async function createTaskAction(input: unknown): Promise<ActionResult> {
@@ -336,30 +336,35 @@ export async function createTaskAction(input: unknown): Promise<ActionResult> {
   }
 
   const { supabase } = await getSessionContext();
-  const { error } = await supabase.from("tasks").insert({
+  const dueDate = new Date(parsed.data.due_date);
+  if (Number.isNaN(dueDate.getTime())) {
+    return { ok: false, message: "Choose a valid task due date." };
+  }
+
+  const { data, error } = await supabase.from("tasks").insert({
     title: parsed.data.title,
     description: parsed.data.description || null,
     assigned_to: parsed.data.assigned_to,
     merchant_id: parsed.data.merchant_id || null,
-    due_date: parsed.data.due_date,
+    due_date: dueDate.toISOString(),
     priority: parsed.data.priority,
     status: "open",
-  });
+  }).select("*").single<Task>();
 
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/");
-  return { ok: true, message: "Task created." };
+  return { ok: true, message: "Task created.", data };
 }
 
 export async function updateTaskStatusAction(taskId: string, status: TaskStatus): Promise<ActionResult> {
   const { supabase } = await getSessionContext();
-  const { error } = await supabase.from("tasks").update({ status }).eq("id", taskId);
+  const { data, error } = await supabase.from("tasks").update({ status }).eq("id", taskId).select("*").single<Task>();
 
   if (error) return { ok: false, message: error.message };
 
   revalidatePath("/");
-  return { ok: true, message: "Task updated." };
+  return { ok: true, message: "Task updated.", data };
 }
 
 async function resolveTeamAssignment(

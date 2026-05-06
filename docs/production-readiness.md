@@ -1,6 +1,6 @@
 # Production Readiness
 
-This checklist tracks the next work needed to operate CVEST CRM as a platform product.
+This checklist tracks the next work needed to operate MR CRM as a platform product.
 
 ## Required Before Inviting More Users
 
@@ -13,17 +13,22 @@ This checklist tracks the next work needed to operate CVEST CRM as a platform pr
   - `OPENAI_MODEL`
   - `CRON_SECRET`
   - `NEXT_PUBLIC_APP_URL`
+  - `NEXT_PUBLIC_COMPANY_NAME`
+  - `NEXT_PUBLIC_PRODUCT_NAME`
+  - `NEXT_PUBLIC_COMPANY_INITIALS`
+  - `NEXT_PUBLIC_SUPPORT_EMAIL`
 - Confirm `/api/health` returns `200` in production.
 - Configure Supabase Auth email templates and redirect URLs:
   - `https://your-domain.com/auth/callback`
   - `https://your-domain.com/reset-password`
 - Enable Vercel Cron or another scheduler to call:
-  - `POST /api/jobs/weekly-summary`
+  - `GET or POST /api/jobs/weekly-summary`
   - header `Authorization: Bearer $CRON_SECRET`
+  - `vercel.json` registers the production cron for Monday at 13:00 UTC.
 
 ## Next Product Work
 
-- Replace public document URLs with signed URLs if merchant files contain sensitive data.
+- Confirm existing merchant documents have been migrated from old public URLs to private storage paths.
 - Add audit logs for merchant edits, pricing approvals, user creation, and Copilot-confirmed actions.
 - Add manager assignment workflows and bulk reassignment.
 - Add residual import from processor reports.

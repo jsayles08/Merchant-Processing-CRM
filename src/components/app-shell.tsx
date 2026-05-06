@@ -7,14 +7,14 @@ import {
   Gauge,
   HandCoins,
   LayoutDashboard,
-  Plus,
-  Search,
   Settings,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
+import { HeaderActions } from "@/components/header-actions";
 import { Button } from "@/components/ui/button";
+import { brand } from "@/lib/branding";
 import type { Profile } from "@/lib/types";
 
 const navItems = [
@@ -37,11 +37,11 @@ export function AppShell({ children, profile }: { children: React.ReactNode; pro
         <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white px-4 py-5 dark:border-slate-800 dark:bg-slate-950 lg:block">
           <div className="flex items-center gap-3 px-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-sm font-bold text-white">
-              CV
+              {brand.initials}
             </div>
             <div>
-              <p className="text-sm font-bold tracking-wide">CVEST</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Merchant Growth CRM</p>
+              <p className="text-sm font-bold tracking-wide">{brand.companyName}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{brand.productName}</p>
             </div>
           </div>
 
@@ -81,7 +81,7 @@ export function AppShell({ children, profile }: { children: React.ReactNode; pro
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-sm font-bold text-white lg:hidden">
-                  CV
+                  {brand.initials}
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
@@ -94,21 +94,7 @@ export function AppShell({ children, profile }: { children: React.ReactNode; pro
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="relative block sm:w-72">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-                    placeholder="Search merchants, agents, deals"
-                  />
-                </label>
-                <Button variant="secondary">
-                  <Bot className="h-4 w-4" />
-                  Ask Copilot
-                </Button>
-                <Button>
-                  <Plus className="h-4 w-4" />
-                  Add Merchant
-                </Button>
+                <HeaderActions />
                 {profile ? (
                   <form action={signOutAction}>
                     <Button variant="ghost" type="submit">

@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export async function GET(request: Request) {
+  return runWeeklySummaryJob(request);
+}
+
 export async function POST(request: Request) {
+  return runWeeklySummaryJob(request);
+}
+
+async function runWeeklySummaryJob(request: Request) {
   const authHeader = request.headers.get("authorization");
   const expected = process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : null;
 

@@ -202,6 +202,7 @@ export function CopilotPanel({
 
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <Textarea
+              id="copilot-input"
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {

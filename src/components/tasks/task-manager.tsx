@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CalendarCheck, CheckCircle2, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CalendarCheck, CheckCircle2, ClipboardList, Plus } from "lucide-react";
 import { createTaskAction, updateTaskStatusAction } from "@/lib/actions";
-import type { CrmData, Priority, Profile, TaskStatus } from "@/lib/types";
+import type { CrmData, Priority, Profile, Task, TaskStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { titleCase } from "@/lib/utils";
 
@@ -19,16 +21,22 @@ type TaskForm = {
   priority: Priority;
 };
 
+function defaultDueDate() {
+  return new Date(Date.now() + 86_400_000).toISOString().slice(0, 16);
+}
+
 export function TaskManager({ data, currentProfile }: { data: CrmData; currentProfile: Profile }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
+  const [tasks, setTasks] = useState(data.tasks);
   const assigneeOptions = data.profiles.filter((profile) => profile.status === "active");
   const [form, setForm] = useState<TaskForm>({
     title: "",
     description: "",
     assigned_to: currentProfile.id,
     merchant_id: "",
-    due_date: "",
+    due_date: defaultDueDate(),
     priority: "medium",
   });
 
@@ -41,7 +49,11 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
       const result = await createTaskAction(form);
       setMessage(result.message);
       if (result.ok) {
-        setForm((current) => ({ ...current, title: "", description: "", merchant_id: "" }));
+        if (result.data) {
+          setTasks((current) => [result.data as Task, ...current]);
+        }
+        setForm((current) => ({ ...current, title: "", description: "", merchant_id: "", due_date: defaultDueDate() }));
+        router.refresh();
       }
     });
   }
@@ -50,11 +62,15 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
     startTransition(async () => {
       const result = await updateTaskStatusAction(taskId, status);
       setMessage(result.message);
+      if (result.ok) {
+        setTasks((current) => current.map((task) => (task.id === taskId ? { ...task, status } : task)));
+        router.refresh();
+      }
     });
   }
 
-  const openTasks = data.tasks.filter((task) => task.status !== "completed");
-  const completedTasks = data.tasks.filter((task) => task.status === "completed").slice(0, 5);
+  const openTasks = tasks.filter((task) => task.status !== "completed");
+  const completedTasks = tasks.filter((task) => task.status === "completed").slice(0, 5);
 
   return (
     <section id="tasks-follow-ups" className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
@@ -120,6 +136,13 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {!openTasks.length && !completedTasks.length ? (
+            <EmptyState
+              icon={<ClipboardList className="h-5 w-5" />}
+              title="No tasks yet"
+              description="Create the first follow-up, onboarding, or underwriting task for this team."
+            />
+          ) : null}
           {openTasks.map((task) => {
             const merchant = data.merchants.find((item) => item.id === task.merchant_id);
             const assignee = data.profiles.find((item) => item.id === task.assigned_to);
