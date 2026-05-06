@@ -4,6 +4,7 @@ import { requestPasswordResetAction, signInAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
+import { brand } from "@/lib/branding";
 
 export default function LoginPage({
   searchParams,
@@ -27,7 +28,7 @@ async function LoginForm({ searchParams }: { searchParams: Promise<{ error?: str
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-600 text-white">
             <Landmark className="h-6 w-6" />
           </div>
-          <CardTitle>Sign in to CVEST</CardTitle>
+          <CardTitle>Sign in to {brand.companyName}</CardTitle>
           <CardDescription>Use your company-issued agent or manager account.</CardDescription>
         </CardHeader>
         <CardContent>

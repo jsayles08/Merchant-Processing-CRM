@@ -406,7 +406,7 @@ begin
   insert into notifications (profile_id, title, body, url)
   select
     a.profile_id,
-    'Weekly CVEST performance summary',
+    'Weekly performance summary',
     s.summary,
     '/'
   from agent_performance_summaries s
@@ -423,5 +423,5 @@ values ('merchant-documents', 'merchant-documents', true)
 on conflict (id) do nothing;
 
 insert into compensation_rules (rule_name)
-values ('CVEST Standard Agent Plan')
+values ('MR CRM Standard Agent Plan')
 on conflict (rule_name) do nothing;

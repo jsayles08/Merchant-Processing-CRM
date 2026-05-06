@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/incompatible-library -- TanStack Table intentionally returns function accessors that React Compiler skips. */
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   type ColumnDef,
   flexRender,
@@ -67,6 +67,9 @@ export function MerchantManager({
   const [globalFilter, setGlobalFilter] = useState("");
   const [selectedId, setSelectedId] = useState(data.merchants[0]?.id ?? "");
   const [form, setForm] = useState<FormState>(blankForm);
+  const [showControls, setShowControls] = useState(false);
+  const [stageFilter, setStageFilter] = useState<MerchantStatus | "all">("all");
+  const [agentFilter, setAgentFilter] = useState("all");
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
 
@@ -84,7 +87,19 @@ export function MerchantManager({
     const profile = data.profiles.find((item) => item.id === agent.profile_id);
     return { id: agent.id, label: profile?.full_name ?? agent.agent_code };
   });
-  const effectiveAssignedAgentId = currentProfile.role === "agent" ? currentAgentId : form.assigned_agent_id || currentAgentId;
+  const defaultAssignedAgentId = currentAgentId || agentOptions[0]?.id || "";
+  const effectiveAssignedAgentId =
+    currentProfile.role === "agent" ? currentAgentId : form.assigned_agent_id || defaultAssignedAgentId;
+  const filteredMerchants = useMemo(
+    () =>
+      merchants.filter((merchant) => {
+        const matchesStage = stageFilter === "all" || merchant.status === stageFilter;
+        const matchesAgent = agentFilter === "all" || merchant.assigned_agent_id === agentFilter;
+        return matchesStage && matchesAgent;
+      }),
+    [agentFilter, merchants, stageFilter],
+  );
+  const hasActiveControls = Boolean(globalFilter || stageFilter !== "all" || agentFilter !== "all");
 
   const columns = useMemo<ColumnDef<Merchant>[]>(
     () => [
@@ -141,7 +156,7 @@ export function MerchantManager({
   );
 
   const table = useReactTable({
-    data: merchants,
+    data: filteredMerchants,
     columns,
     state: { globalFilter },
     onGlobalFilterChange: setGlobalFilter,
@@ -156,8 +171,30 @@ export function MerchantManager({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function resetFilters() {
+    setGlobalFilter("");
+    setStageFilter("all");
+    setAgentFilter("all");
+  }
+
+  useEffect(() => {
+    function handleGlobalSearch(event: Event) {
+      const query = (event as CustomEvent<{ query?: string }>).detail?.query ?? "";
+      setGlobalFilter(query);
+    }
+
+    window.addEventListener("crm:global-search", handleGlobalSearch);
+    return () => window.removeEventListener("crm:global-search", handleGlobalSearch);
+  }, []);
+
   function addMerchant() {
     if (!form.business_name.trim() || !form.contact_name.trim()) {
+      setMessage("Business name and contact are required.");
+      return;
+    }
+
+    if (!effectiveAssignedAgentId) {
+      setMessage("Create or select an agent before adding merchants.");
       return;
     }
 
@@ -231,19 +268,60 @@ export function MerchantManager({
               <label className="relative block w-full min-w-0 sm:w-72">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
+                  id="merchant-filter"
                   className="pl-9"
                   value={globalFilter}
                   onChange={(event) => setGlobalFilter(event.target.value)}
                   placeholder="Filter merchant table"
                 />
               </label>
-              <Button variant="secondary" size="icon" aria-label="Table controls">
+              <Button
+                variant="secondary"
+                size="icon"
+                type="button"
+                aria-label="Table controls"
+                aria-expanded={showControls}
+                aria-controls="merchant-table-controls"
+                onClick={() => setShowControls((current) => !current)}
+              >
                 <SlidersHorizontal className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
+          {showControls ? (
+            <div
+              id="merchant-table-controls"
+              className="mb-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-[1fr_1fr_auto]"
+            >
+              <Field label="Stage filter">
+                <Select value={stageFilter} onChange={(event) => setStageFilter(event.target.value as MerchantStatus | "all")}>
+                  <option value="all">All stages</option>
+                  {pipelineStages.map((stage) => (
+                    <option key={stage.id} value={stage.id}>
+                      {stage.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Agent filter">
+                <Select value={agentFilter} onChange={(event) => setAgentFilter(event.target.value)}>
+                  <option value="all">All agents</option>
+                  {agentOptions.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <div className="flex items-end">
+                <Button className="w-full md:w-auto" variant="secondary" type="button" onClick={resetFilters} disabled={!hasActiveControls}>
+                  Reset
+                </Button>
+              </div>
+            </div>
+          ) : null}
           {table.getRowModel().rows.length ? (
             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
               <div className="overflow-x-auto">
@@ -278,13 +356,20 @@ export function MerchantManager({
               icon={<Building2 className="h-5 w-5" />}
               title="No merchants found"
               description="Adjust your filter or add the first merchant in this book."
+              action={
+                hasActiveControls ? (
+                  <Button variant="secondary" type="button" onClick={resetFilters}>
+                    Clear filters
+                  </Button>
+                ) : null
+              }
             />
           )}
         </CardContent>
       </Card>
 
       <div className="space-y-6">
-        <Card>
+        <Card id="add-merchant">
           <CardHeader>
             <CardTitle>Add Merchant</CardTitle>
             <CardDescription>Fast lead capture for agents in the field.</CardDescription>
@@ -292,7 +377,7 @@ export function MerchantManager({
           <CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               <Field label="Business name">
-                <Input value={form.business_name} onChange={(event) => updateField("business_name", event.target.value)} placeholder="ABC Grocery" />
+                <Input id="merchant-business-name" value={form.business_name} onChange={(event) => updateField("business_name", event.target.value)} placeholder="ABC Grocery" />
               </Field>
               <Field label="Contact">
                 <Input value={form.contact_name} onChange={(event) => updateField("contact_name", event.target.value)} placeholder="Primary contact" />

@@ -1,6 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { ShieldCheck, XCircle } from "lucide-react";
 import { approveDealAction } from "@/lib/actions";
 import type { Agent, Deal, Merchant, Profile, Role } from "@/lib/types";
@@ -22,10 +23,24 @@ export function ApprovalQueue({
   profiles: Profile[];
   currentRole: Role;
 }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const pendingDeals = deals.filter((deal) => deal.approval_status === "pending");
+  const [reviewedDealIds, setReviewedDealIds] = useState<Set<string>>(() => new Set());
+  const [message, setMessage] = useState("");
+  const pendingDeals = deals.filter((deal) => deal.approval_status === "pending" && !reviewedDealIds.has(deal.id));
 
   if (!pendingDeals.length) return null;
+
+  function reviewDeal(dealId: string, approvalStatus: "approved" | "denied") {
+    startTransition(async () => {
+      const result = await approveDealAction(dealId, approvalStatus);
+      setMessage(result.message);
+      if (result.ok) {
+        setReviewedDealIds((current) => new Set(current).add(dealId));
+        router.refresh();
+      }
+    });
+  }
 
   return (
     <section id="approval-requests">
@@ -40,6 +55,11 @@ export function ApprovalQueue({
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
+          {message ? (
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 lg:col-span-2">
+              {message}
+            </div>
+          ) : null}
           {pendingDeals.map((deal) => {
             const merchant = merchants.find((item) => item.id === deal.merchant_id);
             const agent = agents.find((item) => item.id === deal.agent_id);
@@ -64,7 +84,7 @@ export function ApprovalQueue({
                     <Button
                       size="sm"
                       disabled={isPending}
-                      onClick={() => startTransition(() => void approveDealAction(deal.id, "approved"))}
+                      onClick={() => reviewDeal(deal.id, "approved")}
                     >
                       <ShieldCheck className="h-4 w-4" />
                       Approve
@@ -73,7 +93,7 @@ export function ApprovalQueue({
                       size="sm"
                       variant="danger"
                       disabled={isPending}
-                      onClick={() => startTransition(() => void approveDealAction(deal.id, "denied"))}
+                      onClick={() => reviewDeal(deal.id, "denied")}
                     >
                       <XCircle className="h-4 w-4" />
                       Deny

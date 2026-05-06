@@ -1,6 +1,6 @@
 # Production Readiness
 
-This checklist tracks the next work needed to operate CVEST CRM as a platform product.
+This checklist tracks the next work needed to operate MR CRM as a platform product.
 
 ## Required Before Inviting More Users
 
@@ -13,6 +13,10 @@ This checklist tracks the next work needed to operate CVEST CRM as a platform pr
   - `OPENAI_MODEL`
   - `CRON_SECRET`
   - `NEXT_PUBLIC_APP_URL`
+  - `NEXT_PUBLIC_COMPANY_NAME`
+  - `NEXT_PUBLIC_PRODUCT_NAME`
+  - `NEXT_PUBLIC_COMPANY_INITIALS`
+  - `NEXT_PUBLIC_SUPPORT_EMAIL`
 - Confirm `/api/health` returns `200` in production.
 - Configure Supabase Auth email templates and redirect URLs:
   - `https://your-domain.com/auth/callback`

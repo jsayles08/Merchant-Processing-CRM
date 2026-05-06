@@ -1,10 +1,10 @@
 insert into profiles (id, user_id, full_name, email, role, phone, status, manager_id)
 values
-  ('00000000-0000-0000-0000-000000000001', null, 'Maya Chen', 'maya@cvest.example', 'admin', '(716) 555-0110', 'active', null),
-  ('00000000-0000-0000-0000-000000000002', null, 'Andre Blake', 'andre@cvest.example', 'manager', '(716) 555-0111', 'active', null),
-  ('00000000-0000-0000-0000-000000000003', null, 'Jordan Ellis', 'jordan@cvest.example', 'agent', '(716) 555-0112', 'active', '00000000-0000-0000-0000-000000000002'),
-  ('00000000-0000-0000-0000-000000000004', null, 'Priya Singh', 'priya@cvest.example', 'agent', '(716) 555-0113', 'active', '00000000-0000-0000-0000-000000000002'),
-  ('00000000-0000-0000-0000-000000000005', null, 'Marcus Reed', 'marcus@cvest.example', 'agent', '(716) 555-0114', 'active', '00000000-0000-0000-0000-000000000002')
+  ('00000000-0000-0000-0000-000000000001', null, 'Maya Chen', 'maya@mrcrm.example', 'admin', '(716) 555-0110', 'active', null),
+  ('00000000-0000-0000-0000-000000000002', null, 'Andre Blake', 'andre@mrcrm.example', 'manager', '(716) 555-0111', 'active', null),
+  ('00000000-0000-0000-0000-000000000003', null, 'Jordan Ellis', 'jordan@mrcrm.example', 'agent', '(716) 555-0112', 'active', '00000000-0000-0000-0000-000000000002'),
+  ('00000000-0000-0000-0000-000000000004', null, 'Priya Singh', 'priya@mrcrm.example', 'agent', '(716) 555-0113', 'active', '00000000-0000-0000-0000-000000000002'),
+  ('00000000-0000-0000-0000-000000000005', null, 'Marcus Reed', 'marcus@mrcrm.example', 'agent', '(716) 555-0114', 'active', '00000000-0000-0000-0000-000000000002')
 on conflict (id) do nothing;
 
 insert into agents (id, profile_id, agent_code, sponsor_agent_id, team_number, team_position, status, start_date)

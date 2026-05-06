@@ -10,6 +10,7 @@ import { TaskManager } from "@/components/tasks/task-manager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getSessionContext } from "@/lib/auth";
+import { brand } from "@/lib/branding";
 import { calculateMonthlyAgentIncome } from "@/lib/compensation";
 import { getCrmData } from "@/lib/data";
 import { currency, percent } from "@/lib/utils";
@@ -44,7 +45,7 @@ export default async function Home() {
           <Card>
             <CardHeader>
               <CardTitle>Compensation Logic</CardTitle>
-              <CardDescription>Rule defaults that match the CVEST model.</CardDescription>
+              <CardDescription>Rule defaults that match the {brand.companyName} model.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <Rule label="Base residual" value={percent(data.compensationRule.base_residual_percentage, 0)} />

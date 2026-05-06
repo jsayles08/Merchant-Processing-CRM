@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { brand } from "@/lib/branding";
 import { getEnvironmentReport, isSupabaseAdminConfigured } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -36,7 +37,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ok,
-      service: "cvest-crm",
+      service: brand.companyName,
       timestamp: new Date().toISOString(),
       checks,
     },

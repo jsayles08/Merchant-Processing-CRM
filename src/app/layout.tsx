@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { brand } from "@/lib/branding";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CVEST CRM",
-  description: "Internal merchant processing CRM for CVEST agents and managers.",
+  title: brand.companyName,
+  description: `${brand.productName} for agents, managers, and admins.`,
 };
 
 export default function RootLayout({

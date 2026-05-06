@@ -202,10 +202,30 @@ using (
   )
 );
 
-create policy "tasks writable by assignee or admin"
+drop policy if exists "tasks writable by assignee or admin" on tasks;
+drop policy if exists "tasks writable by assignee manager or admin" on tasks;
+create policy "tasks writable by assignee manager or admin"
 on tasks for all
-using (is_admin() or assigned_to = current_profile_id())
-with check (is_admin() or assigned_to = current_profile_id());
+using (
+  is_admin()
+  or assigned_to = current_profile_id()
+  or exists (
+    select 1
+    from profiles p
+    where p.id = tasks.assigned_to
+      and p.manager_id = current_profile_id()
+  )
+)
+with check (
+  is_admin()
+  or assigned_to = current_profile_id()
+  or exists (
+    select 1
+    from profiles p
+    where p.id = tasks.assigned_to
+      and p.manager_id = current_profile_id()
+  )
+);
 
 create policy "documents visible through merchant"
 on documents for select
