@@ -1,4 +1,4 @@
-# MR CRM
+# MerchantDesk
 
 Production-minded merchant processing CRM for agents, managers, and admins to manage merchant acquisition, onboarding, residual tracking, team growth, and AI-assisted follow-up. The visible brand can be configured per company through public environment variables.
 

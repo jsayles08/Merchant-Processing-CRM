@@ -1,6 +1,6 @@
 # Production Readiness
 
-This checklist tracks the next work needed to operate MR CRM as a platform product.
+This checklist tracks the next work needed to operate MerchantDesk as a platform product.
 
 ## Required Before Inviting More Users
 

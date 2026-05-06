@@ -427,5 +427,5 @@ set public = false
 where id = 'merchant-documents';
 
 insert into compensation_rules (rule_name)
-values ('MR CRM Standard Agent Plan')
+values ('MerchantDesk Standard Agent Plan')
 on conflict (rule_name) do nothing;

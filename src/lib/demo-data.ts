@@ -360,7 +360,7 @@ export const demoData: CrmData = {
   ],
   compensationRule: {
     id: "rule-default",
-    rule_name: "MR CRM Standard Agent Plan",
+    rule_name: "MerchantDesk Standard Agent Plan",
     base_residual_percentage: 40,
     minimum_processing_rate: 1.5,
     override_per_active_recruit: 0.25,
