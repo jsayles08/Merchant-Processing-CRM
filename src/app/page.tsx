@@ -88,7 +88,7 @@ export default async function Home() {
             </CardContent>
           </Card>
         </section>
-        <BusinessReports data={data} />
+        <BusinessReports data={data} currentProfile={profile} />
         <AdminSettings data={data} currentProfile={profile} />
       </div>
     </AppShell>

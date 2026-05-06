@@ -2,14 +2,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { demoData } from "@/lib/demo-data";
 import type {
   Agent,
+  AuditLog,
   CompensationRule,
   CrmData,
   Deal,
   Document,
+  DocumentStorageMigrationStatus,
   Merchant,
   MerchantUpdate,
   Profile,
   Residual,
+  ResidualImportBatch,
   Task,
   Team,
   TeamMember,
@@ -38,9 +41,11 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     tasks,
     documents,
     residuals,
+    residualImportBatches,
     teams,
     teamMembers,
     compensationRules,
+    auditLogs,
   ] = await Promise.all([
     selectAll<Profile>(supabase, "profiles", "created_at"),
     selectAll<Agent>(supabase, "agents", "created_at"),
@@ -50,9 +55,11 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     selectAll<Task>(supabase, "tasks", "due_date"),
     selectAll<Document>(supabase, "documents", "created_at", false),
     selectAll<Residual>(supabase, "residuals", "month", false),
+    selectOptionalAll<ResidualImportBatch>(supabase, "residual_import_batches", "created_at", false),
     selectAll<Team>(supabase, "teams", "created_at"),
     selectAll<TeamMember>(supabase, "team_members", "created_at"),
     selectAll<CompensationRule>(supabase, "compensation_rules", "created_at", false),
+    selectOptionalAll<AuditLog>(supabase, "audit_logs", "created_at", false),
   ]);
 
   return {
@@ -64,9 +71,33 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     tasks,
     documents,
     residuals,
+    residualImportBatches,
     teams,
     teamMembers,
     compensationRule: compensationRules[0] ?? defaultRule,
+    auditLogs,
+  };
+}
+
+export async function getDocumentStorageMigrationStatus(
+  supabase: SupabaseClient,
+): Promise<DocumentStorageMigrationStatus> {
+  const [total, publicHttp, publicRelative] = await Promise.all([
+    supabase.from("documents").select("id", { count: "exact", head: true }),
+    supabase.from("documents").select("id", { count: "exact", head: true }).like("file_url", "http%"),
+    supabase.from("documents").select("id", { count: "exact", head: true }).like("file_url", "/%"),
+  ]);
+
+  if (total.error || publicHttp.error || publicRelative.error) {
+    return { total_documents: 0, public_url_documents: 0, private_path_documents: 0 };
+  }
+
+  const totalDocuments = total.count ?? 0;
+  const publicUrlDocuments = (publicHttp.count ?? 0) + (publicRelative.count ?? 0);
+  return {
+    total_documents: totalDocuments,
+    public_url_documents: publicUrlDocuments,
+    private_path_documents: Math.max(totalDocuments - publicUrlDocuments, 0),
   };
 }
 
@@ -112,6 +143,20 @@ async function selectAll<T>(
 ): Promise<T[]> {
   const { data, error } = await supabase.from(table).select("*").order(orderBy, { ascending });
   if (error) throw error;
+  return (data ?? []) as T[];
+}
+
+async function selectOptionalAll<T>(
+  supabase: SupabaseClient,
+  table: string,
+  orderBy: string,
+  ascending = true,
+): Promise<T[]> {
+  const { data, error } = await supabase.from(table).select("*").order(orderBy, { ascending });
+  if (error) {
+    console.warn(`Optional table ${table} is not available yet.`, error.message);
+    return [];
+  }
   return (data ?? []) as T[];
 }
 

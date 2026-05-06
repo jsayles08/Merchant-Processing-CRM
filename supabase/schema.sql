@@ -153,6 +153,19 @@ create table if not exists residuals (
   unique (merchant_id, month)
 );
 
+create table if not exists residual_import_batches (
+  id uuid primary key default gen_random_uuid(),
+  uploaded_by uuid not null references profiles(id),
+  processor_name text not null,
+  statement_month date not null,
+  row_count integer not null default 0,
+  imported_count integer not null default 0,
+  error_count integer not null default 0,
+  status text not null default 'pending' check (status in ('pending', 'completed', 'failed')),
+  error_summary text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists teams (
   id uuid primary key default gen_random_uuid(),
   leader_agent_id uuid not null references agents(id) on delete cascade,
@@ -225,10 +238,42 @@ create table if not exists notifications (
   title text not null,
   body text not null,
   url text,
+  dedupe_key text unique,
   status text not null default 'unread',
   read_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table notifications add column if not exists dedupe_key text unique;
+
+create table if not exists notification_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  notification_id uuid references notifications(id) on delete cascade,
+  profile_id uuid references profiles(id) on delete cascade,
+  channel text not null check (channel in ('email', 'sms')),
+  provider text not null,
+  recipient text,
+  status text not null default 'pending' check (status in ('pending', 'sent', 'skipped', 'failed')),
+  error_message text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_profile_id uuid references profiles(id) on delete set null,
+  action text not null,
+  entity_type text not null,
+  entity_id uuid,
+  summary text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists audit_logs_entity_idx on audit_logs (entity_type, entity_id, created_at desc);
+create index if not exists audit_logs_actor_idx on audit_logs (actor_profile_id, created_at desc);
+create index if not exists notification_deliveries_profile_idx on notification_deliveries (profile_id, created_at desc);
+create index if not exists residual_import_batches_created_idx on residual_import_batches (created_at desc);
 
 create or replace function set_updated_at()
 returns trigger
@@ -357,6 +402,13 @@ select
 from agents a
 left join residuals r on r.agent_id = a.id
 group by a.id, date_trunc('month', r.month);
+
+create or replace view document_storage_migration_status as
+select
+  count(*)::integer as total_documents,
+  count(*) filter (where file_url ilike 'http%' or file_url like '/%')::integer as public_url_documents,
+  count(*) filter (where file_url not ilike 'http%' and file_url not like '/%')::integer as private_path_documents
+from documents;
 
 create or replace function create_weekly_agent_performance_summaries(target_week_start date default date_trunc('week', current_date)::date)
 returns integer

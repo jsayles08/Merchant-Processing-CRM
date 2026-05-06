@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
 import { brand } from "@/lib/branding";
+import { normalizeImportMonth, parseProcessorResidualCsv } from "@/lib/residual-import";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { MerchantStatus, Task, TaskStatus } from "@/lib/types";
 
@@ -47,6 +49,22 @@ const TaskInput = z.object({
   merchant_id: z.string().optional(),
   due_date: z.string().min(1),
   priority: z.enum(["low", "medium", "high"]),
+});
+
+const BulkAssignProfilesInput = z.object({
+  profile_ids: z.array(z.string().uuid()).min(1),
+  manager_id: z.string().uuid().nullable().optional(),
+});
+
+const BulkReassignMerchantsInput = z.object({
+  from_agent_id: z.string().uuid(),
+  to_agent_id: z.string().uuid(),
+});
+
+const ResidualImportInput = z.object({
+  processor_name: z.string().min(1).default("Processor report"),
+  statement_month: z.string().min(1),
+  csv_text: z.string().min(1),
 });
 
 export async function createMerchantAction(input: unknown): Promise<ActionResult> {
@@ -108,12 +126,20 @@ export async function createMerchantAction(input: unknown): Promise<ActionResult
     return { ok: false, message: dealError.message };
   }
 
+  await writeAuditLog(supabase, profile, {
+    action: "merchant.create",
+    entityType: "merchant",
+    entityId: merchant.id,
+    summary: `${profile.full_name} created merchant ${parsed.data.business_name}.`,
+    metadata: { assigned_agent_id: assignedAgentId, status: parsed.data.status },
+  });
+
   revalidatePath("/");
   return { ok: true, message: `${parsed.data.business_name} was created.`, data: merchant };
 }
 
 export async function updateMerchantStatusAction(merchantId: string, status: MerchantStatus): Promise<ActionResult> {
-  const { supabase } = await getSessionContext();
+  const { supabase, profile } = await getSessionContext();
   const { error: merchantError } = await supabase.from("merchants").update({ status }).eq("id", merchantId);
 
   if (merchantError) {
@@ -125,6 +151,14 @@ export async function updateMerchantStatusAction(merchantId: string, status: Mer
   if (dealError) {
     return { ok: false, message: dealError.message };
   }
+
+  await writeAuditLog(supabase, profile, {
+    action: "merchant.status_update",
+    entityType: "merchant",
+    entityId: merchantId,
+    summary: `${profile.full_name} moved a merchant to ${status}.`,
+    metadata: { status },
+  });
 
   revalidatePath("/");
   revalidatePath(`/merchants/${merchantId}`);
@@ -158,6 +192,14 @@ export async function createMerchantUpdateAction(formData: FormData): Promise<Ac
 
   if (error) return { ok: false, message: error.message };
 
+  await writeAuditLog(supabase, profile, {
+    action: "merchant.update_create",
+    entityType: "merchant",
+    entityId: merchantId,
+    summary: `${profile.full_name} added a ${updateType} update.`,
+    metadata: { update_type: updateType, next_follow_up_date: nextFollowUpDate || null },
+  });
+
   revalidatePath("/");
   revalidatePath(`/merchants/${merchantId}`);
   return { ok: true, message: "Merchant update saved." };
@@ -173,6 +215,14 @@ export async function approveDealAction(dealId: string, approvalStatus: "approve
   const { error } = await supabase.from("deals").update({ approval_status: approvalStatus }).eq("id", dealId);
 
   if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "pricing.approval",
+    entityType: "deal",
+    entityId: dealId,
+    summary: `${profile.full_name} ${approvalStatus} a pricing exception.`,
+    metadata: { approval_status: approvalStatus },
+  });
 
   revalidatePath("/");
   return { ok: true, message: `Deal ${approvalStatus}.` };
@@ -206,6 +256,14 @@ export async function uploadMerchantDocumentAction(formData: FormData): Promise<
   });
 
   if (documentError) return { ok: false, message: documentError.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "merchant.document_upload",
+    entityType: "merchant",
+    entityId: merchantId,
+    summary: `${profile.full_name} uploaded ${file.name}.`,
+    metadata: { document_type: documentType, storage_path: path },
+  });
 
   revalidatePath(`/merchants/${merchantId}`);
   return { ok: true, message: "Document uploaded." };
@@ -325,8 +383,223 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
     }
   }
 
+  await writeAuditLog(supabase, profile, {
+    action: "user.upsert",
+    entityType: "profile",
+    entityId: profileRow.id,
+    summary: `${profile.full_name} created or updated ${parsed.data.full_name}.`,
+    metadata: { role: parsed.data.role, status: parsed.data.status, manager_id: parsed.data.manager_id || null },
+  });
+
   revalidatePath("/");
   return { ok: true, message: `${parsed.data.full_name} is ready to use ${brand.companyName}.` };
+}
+
+export async function bulkAssignProfilesToManagerAction(input: unknown): Promise<ActionResult> {
+  const parsed = BulkAssignProfilesInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose at least one profile to assign." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can change manager assignments." };
+  }
+
+  const managerId = parsed.data.manager_id || null;
+  if (managerId) {
+    const { data: manager, error: managerError } = await supabase
+      .from("profiles")
+      .select("id,role")
+      .eq("id", managerId)
+      .single<{ id: string; role: string }>();
+
+    if (managerError || !manager || !["manager", "admin"].includes(manager.role)) {
+      return { ok: false, message: "Choose a manager or admin as the manager assignment." };
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ manager_id: managerId })
+    .in("id", parsed.data.profile_ids)
+    .neq("role", "admin")
+    .select("id");
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "manager.bulk_assign",
+    entityType: "profile",
+    summary: `${profile.full_name} updated manager assignments for ${data?.length ?? 0} profiles.`,
+    metadata: { profile_ids: parsed.data.profile_ids, manager_id: managerId },
+  });
+
+  revalidatePath("/");
+  return { ok: true, message: `Updated ${data?.length ?? 0} manager assignments.` };
+}
+
+export async function bulkReassignMerchantsAction(input: unknown): Promise<ActionResult> {
+  const parsed = BulkReassignMerchantsInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose the source and destination agents." };
+  }
+
+  if (parsed.data.from_agent_id === parsed.data.to_agent_id) {
+    return { ok: false, message: "Choose two different agents." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can bulk reassign merchant books." };
+  }
+
+  const { data: merchants, error: merchantError } = await supabase
+    .from("merchants")
+    .update({ assigned_agent_id: parsed.data.to_agent_id })
+    .eq("assigned_agent_id", parsed.data.from_agent_id)
+    .select("id");
+
+  if (merchantError) return { ok: false, message: merchantError.message };
+
+  const merchantIds = (merchants ?? []).map((merchant) => merchant.id);
+  if (merchantIds.length) {
+    const { error: dealError } = await supabase
+      .from("deals")
+      .update({ agent_id: parsed.data.to_agent_id })
+      .in("merchant_id", merchantIds);
+
+    if (dealError) return { ok: false, message: dealError.message };
+  }
+
+  await writeAuditLog(supabase, profile, {
+    action: "merchant.bulk_reassign",
+    entityType: "merchant",
+    summary: `${profile.full_name} reassigned ${merchantIds.length} merchants.`,
+    metadata: {
+      from_agent_id: parsed.data.from_agent_id,
+      to_agent_id: parsed.data.to_agent_id,
+      merchant_ids: merchantIds,
+    },
+  });
+
+  revalidatePath("/");
+  return { ok: true, message: `Reassigned ${merchantIds.length} merchants.` };
+}
+
+export async function importResidualReportAction(input: unknown): Promise<ActionResult> {
+  const parsed = ResidualImportInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Upload a processor residual CSV and statement month." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can import processor residual reports." };
+  }
+
+  let statementMonth: string;
+  try {
+    statementMonth = normalizeImportMonth(parsed.data.statement_month);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Choose a valid statement month." };
+  }
+
+  const parsedCsv = parseProcessorResidualCsv(parsed.data.csv_text);
+
+  const { data: batch, error: batchError } = await supabase
+    .from("residual_import_batches")
+    .insert({
+      uploaded_by: profile.id,
+      processor_name: parsed.data.processor_name,
+      statement_month: statementMonth,
+      row_count: parsedCsv.rows.length + parsedCsv.errors.length,
+      error_count: parsedCsv.errors.length,
+    })
+    .select("id")
+    .single<{ id: string }>();
+
+  if (batchError) {
+    console.warn("Residual import history is not available yet.", batchError.message);
+  }
+
+  const batchId = batch?.id ?? null;
+
+  const { data: rules } = await supabase
+    .from("compensation_rules")
+    .select("base_residual_percentage")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const baseResidualPercentage = Number(rules?.[0]?.base_residual_percentage ?? 40);
+  const errors = [...parsedCsv.errors];
+  const residualRows = [];
+
+  for (const row of parsedCsv.rows) {
+    const merchantQuery = row.merchant_id
+      ? supabase.from("merchants").select("id,assigned_agent_id,business_name").eq("id", row.merchant_id)
+      : supabase.from("merchants").select("id,assigned_agent_id,business_name").ilike("business_name", row.business_name ?? "");
+
+    const { data: merchant, error } = await merchantQuery.maybeSingle<{
+      id: string;
+      assigned_agent_id: string;
+      business_name: string;
+    }>();
+
+    if (error || !merchant) {
+      errors.push(`Line ${row.lineNumber}: merchant was not found.`);
+      continue;
+    }
+
+    const netResidual = row.net_residual;
+    const agentResidualAmount = netResidual * (baseResidualPercentage / 100);
+    residualRows.push({
+      merchant_id: merchant.id,
+      agent_id: row.agent_id || merchant.assigned_agent_id,
+      month: row.month ? normalizeImportMonth(row.month) : statementMonth,
+      processing_volume: row.processing_volume,
+      net_residual: netResidual,
+      agent_residual_amount: agentResidualAmount,
+      company_share: netResidual - agentResidualAmount,
+    });
+  }
+
+  if (residualRows.length) {
+    const { error } = await supabase.from("residuals").upsert(residualRows, { onConflict: "merchant_id,month" });
+    if (error) {
+      errors.push(error.message);
+    }
+  }
+
+  const status = errors.length ? (residualRows.length ? "completed" : "failed") : "completed";
+  await supabase
+  if (batchId) {
+    await supabase
+      .from("residual_import_batches")
+      .update({
+        imported_count: residualRows.length,
+        error_count: errors.length,
+        status,
+        error_summary: errors.slice(0, 8).join("\n") || null,
+      })
+      .eq("id", batchId);
+  }
+
+  await writeAuditLog(supabase, profile, {
+    action: "residual.import",
+    entityType: "residual_import_batch",
+    entityId: batchId,
+    summary: `${profile.full_name} imported ${residualRows.length} residual rows from ${parsed.data.processor_name}.`,
+    metadata: { imported_count: residualRows.length, error_count: errors.length, statement_month: statementMonth },
+  });
+
+  revalidatePath("/");
+  return {
+    ok: status === "completed",
+    message: errors.length
+      ? `Imported ${residualRows.length} rows with ${errors.length} issues.`
+      : `Imported ${residualRows.length} residual rows.`,
+    data: { importedCount: residualRows.length, errors },
+  };
 }
 
 export async function createTaskAction(input: unknown): Promise<ActionResult> {

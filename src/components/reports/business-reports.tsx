@@ -1,10 +1,11 @@
 import { AlertTriangle, BarChart3, CircleDollarSign, UsersRound } from "lucide-react";
-import type { CrmData } from "@/lib/types";
+import type { CrmData, Profile } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ResidualImporter } from "@/components/reports/residual-importer";
 import { currency, daysBetween, percent } from "@/lib/utils";
 
-export function BusinessReports({ data }: { data: CrmData }) {
+export function BusinessReports({ data, currentProfile }: { data: CrmData; currentProfile: Profile }) {
   const agentRows = data.agents.map((agent) => {
     const profile = data.profiles.find((item) => item.id === agent.profile_id);
     const merchants = data.merchants.filter((merchant) => merchant.assigned_agent_id === agent.id);
@@ -99,6 +100,32 @@ export function BusinessReports({ data }: { data: CrmData }) {
           ) : null}
         </CardContent>
       </Card>
+
+      {currentProfile.role === "admin" ? <ResidualImporter /> : null}
+
+      {currentProfile.role === "admin" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Imports</CardTitle>
+            <CardDescription>Processor import batches and exception counts.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.residualImportBatches.slice(0, 5).map((batch) => (
+              <div key={batch.id} className="rounded-lg border border-slate-200 p-4 text-sm dark:border-slate-800">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-950 dark:text-white">{batch.processor_name}</p>
+                    <p className="mt-1 text-slate-500">{batch.statement_month} · {batch.imported_count} imported · {batch.error_count} issues</p>
+                  </div>
+                  <Badge tone={batch.status === "completed" ? "emerald" : batch.status === "failed" ? "rose" : "amber"}>{batch.status}</Badge>
+                </div>
+                {batch.error_summary ? <p className="mt-3 whitespace-pre-line text-xs text-rose-600 dark:text-rose-300">{batch.error_summary}</p> : null}
+              </div>
+            ))}
+            {!data.residualImportBatches.length ? <p className="text-sm text-slate-500">No processor imports yet.</p> : null}
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }

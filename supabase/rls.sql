@@ -6,6 +6,7 @@ alter table deals enable row level security;
 alter table tasks enable row level security;
 alter table documents enable row level security;
 alter table residuals enable row level security;
+alter table residual_import_batches enable row level security;
 alter table teams enable row level security;
 alter table team_members enable row level security;
 alter table compensation_rules enable row level security;
@@ -13,6 +14,8 @@ alter table copilot_messages enable row level security;
 alter table copilot_actions enable row level security;
 alter table agent_performance_summaries enable row level security;
 alter table notifications enable row level security;
+alter table notification_deliveries enable row level security;
+alter table audit_logs enable row level security;
 
 create or replace function current_profile_id()
 returns uuid
@@ -262,6 +265,12 @@ on residuals for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "admin manages residual imports" on residual_import_batches;
+create policy "admin manages residual imports"
+on residual_import_batches for all
+using (is_admin())
+with check (is_admin());
+
 create policy "teams visible by leader sponsor or manager"
 on teams for select
 using (
@@ -334,6 +343,26 @@ create policy "notifications own profile"
 on notifications for all
 using (profile_id = current_profile_id() or is_admin())
 with check (profile_id = current_profile_id() or is_admin());
+
+drop policy if exists "notification deliveries visible by owner or admin" on notification_deliveries;
+create policy "notification deliveries visible by owner or admin"
+on notification_deliveries for select
+using (profile_id = current_profile_id() or is_admin());
+
+drop policy if exists "notification deliveries insert by authenticated" on notification_deliveries;
+create policy "notification deliveries insert by authenticated"
+on notification_deliveries for insert
+with check (auth.uid() is not null);
+
+drop policy if exists "audit logs visible by actor or admin" on audit_logs;
+create policy "audit logs visible by actor or admin"
+on audit_logs for select
+using (actor_profile_id = current_profile_id() or is_admin());
+
+drop policy if exists "audit logs insert by authenticated" on audit_logs;
+create policy "audit logs insert by authenticated"
+on audit_logs for insert
+with check (auth.uid() is not null);
 
 create policy "merchant documents storage read"
 on storage.objects for select

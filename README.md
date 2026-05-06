@@ -24,6 +24,9 @@ Production-minded merchant processing CRM for agents, managers, and admins to ma
 - Compensation utilities for 40% personal residual, recruit activation, team override cap, monthly income, and annualized estimate
 - Agent Copilot with persisted messages/actions and confirmation endpoint for major writes
 - Weekly performance summary job endpoint and database function
+- Daily follow-up reminder job with in-app notifications plus optional Resend and Twilio delivery logs
+- Audit log foundation for merchant edits, pricing approvals, user creation, residual imports, reassignment, and Copilot confirmations
+- Manager assignment, bulk merchant reassignment, and processor residual CSV import workflows
 - Production health endpoint at `/api/health`
 - GitHub Actions CI for lint/build
 - App-level loading, not-found, and error boundaries
@@ -56,9 +59,14 @@ NEXT_PUBLIC_COMPANY_NAME=
 NEXT_PUBLIC_PRODUCT_NAME=
 NEXT_PUBLIC_COMPANY_INITIALS=
 NEXT_PUBLIC_SUPPORT_EMAIL=
+RESEND_API_KEY=
+NOTIFICATION_EMAIL_FROM=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
 ```
 
-`OPENAI_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are server-only and must never be exposed in client components.
+`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, and Twilio credentials are server-only and must never be exposed in client components.
 
 ## Supabase Setup
 
@@ -75,7 +83,8 @@ The schema includes:
 - `profiles`, `agents`, `merchants`, `merchant_updates`, `deals`, `tasks`, `documents`
 - `residuals`, `teams`, `team_members`, `compensation_rules`
 - `copilot_messages`, `copilot_actions`
-- `agent_performance_summaries`, `notifications`
+- `agent_performance_summaries`, `notifications`, `notification_deliveries`
+- `audit_logs`, `residual_import_batches`
 - private Supabase Storage bucket `merchant-documents` with signed document links
 
 Automation triggers include:
@@ -84,6 +93,13 @@ Automation triggers include:
 - merchant/deal `updated_at`
 - follow-up task creation from merchant updates
 - recruit active status refresh when merchant verification changes
+
+Vercel Cron jobs include:
+
+- `GET /api/jobs/weekly-summary` every Monday at 13:00 UTC
+- `GET /api/jobs/follow-up-reminders` daily at 12:00 UTC
+
+Both accept `POST` too and require `Authorization: Bearer $CRON_SECRET`.
 
 ## Auth And Roles
 

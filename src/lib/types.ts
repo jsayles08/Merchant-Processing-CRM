@@ -121,6 +121,19 @@ export type Residual = {
   created_at: string;
 };
 
+export type ResidualImportBatch = {
+  id: string;
+  uploaded_by: string;
+  processor_name: string;
+  statement_month: string;
+  row_count: number;
+  imported_count: number;
+  error_count: number;
+  status: "pending" | "completed" | "failed";
+  error_summary: string | null;
+  created_at: string;
+};
+
 export type Team = {
   id: string;
   leader_agent_id: string;
@@ -159,9 +172,11 @@ export type CrmData = {
   tasks: Task[];
   documents: Document[];
   residuals: Residual[];
+  residualImportBatches: ResidualImportBatch[];
   teams: Team[];
   teamMembers: TeamMember[];
   compensationRule: CompensationRule;
+  auditLogs: AuditLog[];
 };
 
 export type CopilotActionStatus = "suggested" | "requires_confirmation" | "confirmed" | "completed" | "dismissed" | "failed";
@@ -185,4 +200,34 @@ export type CopilotMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   created_at: string;
+};
+
+export type AuditLog = {
+  id: string;
+  actor_profile_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  summary: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type NotificationDelivery = {
+  id: string;
+  notification_id: string | null;
+  profile_id: string | null;
+  channel: "email" | "sms";
+  provider: string;
+  recipient: string | null;
+  status: "pending" | "sent" | "skipped" | "failed";
+  error_message: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type DocumentStorageMigrationStatus = {
+  total_documents: number;
+  public_url_documents: number;
+  private_path_documents: number;
 };

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
 import type { CopilotAction, MerchantStatus } from "@/lib/types";
 
@@ -90,6 +91,18 @@ export async function POST(
     .eq("id", action.id);
 
   if (updateError) throw updateError;
+
+  await writeAuditLog(supabase, profile, {
+    action: "copilot.action_confirmed",
+    entityType: "copilot_action",
+    entityId: action.id,
+    summary: `${profile.full_name} confirmed Copilot action: ${action.action_summary}`,
+    metadata: {
+      action_type: action.action_type,
+      status: completed ? "completed" : "confirmed",
+      merchant_id: merchantId,
+    },
+  });
 
   return NextResponse.json({ ok: true, message: completionMessage, status: completed ? "completed" : "confirmed" });
 }

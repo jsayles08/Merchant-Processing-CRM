@@ -306,6 +306,7 @@ export const demoData: CrmData = {
       created_at: "2026-04-05T10:00:00.000Z",
     },
   ],
+  residualImportBatches: [],
   residuals: [
     {
       id: "residual-1",
@@ -330,6 +331,7 @@ export const demoData: CrmData = {
       created_at: now,
     },
   ],
+  auditLogs: [],
   teams: [
     {
       id: "team-1",
