@@ -72,6 +72,7 @@ as $$
   );
 $$;
 
+drop policy if exists "profiles visible by role" on profiles;
 create policy "profiles visible by role"
 on profiles for select
 using (
@@ -80,11 +81,13 @@ using (
   or manager_id = current_profile_id()
 );
 
+drop policy if exists "admins manage profiles" on profiles;
 create policy "admins manage profiles"
 on profiles for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "agents visible by role" on agents;
 create policy "agents visible by role"
 on agents for select
 using (
@@ -94,11 +97,13 @@ using (
   or sponsor_agent_id = current_agent_id()
 );
 
+drop policy if exists "admins manage agents" on agents;
 create policy "admins manage agents"
 on agents for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "merchants visible by ownership" on merchants;
 create policy "merchants visible by ownership"
 on merchants for select
 using (
@@ -112,10 +117,12 @@ using (
   )
 );
 
+drop policy if exists "agents create own merchants" on merchants;
 create policy "agents create own merchants"
 on merchants for insert
 with check (is_admin() or assigned_agent_id = current_agent_id());
 
+drop policy if exists "agents update own merchants managers update assigned" on merchants;
 create policy "agents update own merchants managers update assigned"
 on merchants for update
 using (
@@ -139,6 +146,7 @@ with check (
   )
 );
 
+drop policy if exists "merchant updates visible by merchant access" on merchant_updates;
 create policy "merchant updates visible by merchant access"
 on merchant_updates for select
 using (
@@ -152,10 +160,12 @@ using (
   )
 );
 
+drop policy if exists "agents create merchant updates" on merchant_updates;
 create policy "agents create merchant updates"
 on merchant_updates for insert
 with check (is_admin() or agent_id = current_agent_id());
 
+drop policy if exists "deals visible by ownership" on deals;
 create policy "deals visible by ownership"
 on deals for select
 using (
@@ -169,6 +179,7 @@ using (
   )
 );
 
+drop policy if exists "deals writable by owners and managers" on deals;
 create policy "deals writable by owners and managers"
 on deals for all
 using (
@@ -192,6 +203,7 @@ with check (
   )
 );
 
+drop policy if exists "tasks visible by assignee or manager" on tasks;
 create policy "tasks visible by assignee or manager"
 on tasks for select
 using (
@@ -230,6 +242,7 @@ with check (
   )
 );
 
+drop policy if exists "documents visible through merchant" on documents;
 create policy "documents visible through merchant"
 on documents for select
 using (
@@ -243,10 +256,12 @@ using (
   )
 );
 
+drop policy if exists "documents insert by uploader" on documents;
 create policy "documents insert by uploader"
 on documents for insert
 with check (is_admin() or uploaded_by = current_profile_id());
 
+drop policy if exists "residuals visible by agent or manager" on residuals;
 create policy "residuals visible by agent or manager"
 on residuals for select
 using (
@@ -260,6 +275,7 @@ using (
   )
 );
 
+drop policy if exists "admin manages residuals" on residuals;
 create policy "admin manages residuals"
 on residuals for all
 using (is_admin())
@@ -271,6 +287,7 @@ on residual_import_batches for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "teams visible by leader sponsor or manager" on teams;
 create policy "teams visible by leader sponsor or manager"
 on teams for select
 using (
@@ -284,6 +301,7 @@ using (
   )
 );
 
+drop policy if exists "team members visible by sponsor" on team_members;
 create policy "team members visible by sponsor"
 on team_members for select
 using (
@@ -292,35 +310,42 @@ using (
   or agent_id = current_agent_id()
 );
 
+drop policy if exists "admin manages teams" on teams;
 create policy "admin manages teams"
 on teams for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "admin manages team members" on team_members;
 create policy "admin manages team members"
 on team_members for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "compensation rules readable" on compensation_rules;
 create policy "compensation rules readable"
 on compensation_rules for select
 using (auth.uid() is not null);
 
+drop policy if exists "admin manages compensation rules" on compensation_rules;
 create policy "admin manages compensation rules"
 on compensation_rules for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "copilot messages own user" on copilot_messages;
 create policy "copilot messages own user"
 on copilot_messages for all
 using (user_id = auth.uid() or is_admin())
 with check (user_id = auth.uid() or is_admin());
 
+drop policy if exists "copilot actions own user" on copilot_actions;
 create policy "copilot actions own user"
 on copilot_actions for all
 using (user_id = auth.uid() or is_admin())
 with check (user_id = auth.uid() or is_admin());
 
+drop policy if exists "weekly summaries visible by agent or manager" on agent_performance_summaries;
 create policy "weekly summaries visible by agent or manager"
 on agent_performance_summaries for select
 using (
@@ -334,11 +359,13 @@ using (
   )
 );
 
+drop policy if exists "admin manages weekly summaries" on agent_performance_summaries;
 create policy "admin manages weekly summaries"
 on agent_performance_summaries for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "notifications own profile" on notifications;
 create policy "notifications own profile"
 on notifications for all
 using (profile_id = current_profile_id() or is_admin())
@@ -364,10 +391,12 @@ create policy "audit logs insert by authenticated"
 on audit_logs for insert
 with check (auth.uid() is not null);
 
+drop policy if exists "merchant documents storage read" on storage.objects;
 create policy "merchant documents storage read"
 on storage.objects for select
 using (bucket_id = 'merchant-documents' and auth.uid() is not null);
 
+drop policy if exists "merchant documents storage insert" on storage.objects;
 create policy "merchant documents storage insert"
 on storage.objects for insert
 with check (bucket_id = 'merchant-documents' and auth.uid() is not null);
