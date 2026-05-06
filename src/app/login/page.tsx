@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Landmark } from "lucide-react";
-import { signInAction } from "@/app/login/actions";
+import { requestPasswordResetAction, signInAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
@@ -8,7 +8,7 @@ import { Input, Label } from "@/components/ui/field";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; message?: string }>;
 }) {
   return (
     <Suspense>
@@ -17,7 +17,7 @@ export default function LoginPage({
   );
 }
 
-async function LoginForm({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+async function LoginForm({ searchParams }: { searchParams: Promise<{ error?: string; message?: string }> }) {
   const params = await searchParams;
 
   return (
@@ -45,8 +45,22 @@ async function LoginForm({ searchParams }: { searchParams: Promise<{ error?: str
                 {params.error}
               </p>
             ) : null}
+            {params.message ? (
+              <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+                {params.message}
+              </p>
+            ) : null}
             <Button className="w-full" type="submit">
               Sign In
+            </Button>
+          </form>
+          <form action={requestPasswordResetAction} className="mt-6 space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <div className="space-y-1.5">
+              <Label htmlFor="reset_email">Forgot password?</Label>
+              <Input id="reset_email" name="email" type="email" autoComplete="email" placeholder="Enter your email" required />
+            </div>
+            <Button className="w-full" type="submit" variant="secondary">
+              Send Password Reset Link
             </Button>
           </form>
         </CardContent>

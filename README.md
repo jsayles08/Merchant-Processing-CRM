@@ -14,6 +14,7 @@ Production-minded internal CRM for CVEST, a fintech merchant processing company.
 ## Implemented
 
 - Protected Supabase auth flow with role-backed profiles
+- Password reset and recovery flow through Supabase Auth
 - Server-rendered CRM data behind Supabase RLS
 - Dashboard with volume, residual, payout, forecast, agent, and recommendation cards
 - Merchant CRUD workflow with Supabase server actions and pricing-floor flags
@@ -23,6 +24,9 @@ Production-minded internal CRM for CVEST, a fintech merchant processing company.
 - Compensation utilities for 40% personal residual, recruit activation, team override cap, monthly income, and annualized estimate
 - Agent Copilot with persisted messages/actions and confirmation endpoint for major writes
 - Weekly performance summary job endpoint and database function
+- Production health endpoint at `/api/health`
+- GitHub Actions CI for lint/build
+- App-level loading, not-found, and error boundaries
 - Notifications table foundation
 - Dark/light mode-ready visual system
 
@@ -113,6 +117,32 @@ Authorization: Bearer $CRON_SECRET
 ```
 
 Use Vercel Cron, Supabase scheduled functions, GitHub Actions, or another scheduler to call it weekly.
+
+## Health Check
+
+Use the health endpoint for uptime checks and deployment verification:
+
+```bash
+GET /api/health
+```
+
+It returns a masked environment report and validates Supabase service-role database access. It returns `503` if required production configuration is missing or the database is unavailable.
+
+## CI
+
+GitHub Actions runs on pushes and pull requests to `main`:
+
+```bash
+npm ci
+npm run lint
+npm run build
+```
+
+See `.github/workflows/ci.yml`.
+
+## Production Checklist
+
+See `docs/production-readiness.md` for the operator checklist, credential rotation notes, and next product hardening work.
 
 ## Credentials Needed For Live Connection
 
