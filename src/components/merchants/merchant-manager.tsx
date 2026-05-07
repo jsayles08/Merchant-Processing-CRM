@@ -111,13 +111,13 @@ export function MerchantManager({
         cell: ({ row }) => (
           <div className="space-y-1">
             <button
-              className="block text-left font-medium text-slate-950 hover:text-emerald-700 dark:text-white"
+              className="block text-left font-semibold text-[#0B0F15] hover:text-[#0E5EC9]"
               onClick={() => setSelectedId(row.original.id)}
             >
               {row.original.business_name}
-              <span className="block text-xs font-normal text-slate-500">{row.original.industry}</span>
+              <span className="block text-xs font-normal text-[#25425E]/65">{row.original.industry}</span>
             </button>
-            <Link className="text-xs font-medium text-emerald-700 hover:text-emerald-800" href={`/merchants/${row.original.id}`}>
+            <Link className="text-xs font-semibold text-[#0E5EC9] hover:text-[#D57D25]" href={`/merchants/${row.original.id}`}>
               Open profile
             </Link>
           </div>
@@ -295,7 +295,7 @@ export function MerchantManager({
           {showControls ? (
             <div
               id="merchant-table-controls"
-              className="mb-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-[1fr_1fr_auto]"
+              className="crm-panel mb-4 grid gap-3 rounded-[24px] p-3 md:grid-cols-[1fr_1fr_auto]"
             >
               <Field label="Stage filter">
                 <Select value={stageFilter} onChange={(event) => setStageFilter(event.target.value as MerchantStatus | "all")}>
@@ -325,10 +325,10 @@ export function MerchantManager({
             </div>
           ) : null}
           {table.getRowModel().rows.length ? (
-            <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+            <div className="overflow-hidden rounded-[24px] border border-[#ABB7C0]/25 bg-white/50">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-sm">
-                  <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <thead className="bg-[#FDFDFD]/80 text-left text-xs uppercase text-[#25425E]/70">
                     {table.getHeaderGroups().map((headerGroup) => (
                       <tr key={headerGroup.id}>
                         {headerGroup.headers.map((header) => (
@@ -339,9 +339,9 @@ export function MerchantManager({
                       </tr>
                     ))}
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-[#ABB7C0]/20">
                     {table.getRowModel().rows.map((row) => (
-                      <tr key={row.id} className="bg-white hover:bg-slate-50 dark:bg-slate-950 dark:hover:bg-slate-900/70">
+                      <tr key={row.id} className="bg-white/65 hover:bg-[#E9D7A1]/18">
                         {row.getVisibleCells().map((cell) => (
                           <td key={cell.id} className="px-4 py-3 align-middle">
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -427,7 +427,7 @@ export function MerchantManager({
               <Textarea value={form.notes} onChange={(event) => updateField("notes", event.target.value)} placeholder="What did they ask for? What is the next step?" />
             </Field>
             {message ? (
-              <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+              <p className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">
                 {message}
               </p>
             ) : null}
@@ -456,7 +456,7 @@ export function MerchantManager({
                 <ProfileLine icon={<FileText className="h-4 w-4" />} label="Processor" value={selectedMerchant.current_processor} />
                 <ProfileLine icon={<CheckCircle2 className="h-4 w-4" />} label="Residual estimate" value={currency(selectedMerchant.monthly_volume_estimate * (selectedMerchant.proposed_rate / 100) * 0.28)} />
               </div>
-              <div className="rounded-md border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+              <div className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">
                 {selectedMerchant.notes || "No notes yet."}
               </div>
               <Field label="Move deal stage">
@@ -487,17 +487,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function ProfileLine({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-slate-100 p-3 dark:border-slate-800">
-      <span className="flex min-w-0 items-center gap-2 text-slate-500 dark:text-slate-400">
+    <div className="crm-panel flex items-center justify-between gap-3 rounded-2xl p-3">
+      <span className="flex min-w-0 items-center gap-2 text-[#25425E]/70">
         {icon}
         <span className="truncate">{label}</span>
       </span>
-      <span className="min-w-0 truncate text-right font-medium text-slate-950 dark:text-white">{value}</span>
+      <span className="min-w-0 truncate text-right font-semibold text-[#0B0F15]">{value}</span>
     </div>
   );
 }
 
 export function StatusBadge({ status }: { status: MerchantStatus }) {
-  const tone = status === "processing" || status === "approved" ? "emerald" : status === "underwriting" ? "amber" : status === "lost" ? "rose" : "blue";
+  const tone = status === "processing" || status === "approved" ? "blue" : status === "underwriting" ? "amber" : status === "lost" ? "rose" : "slate";
   return <Badge tone={tone}>{titleCase(status)}</Badge>;
 }

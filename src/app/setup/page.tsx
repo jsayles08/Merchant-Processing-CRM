@@ -3,8 +3,8 @@ import { brand } from "@/lib/branding";
 
 export default function SetupPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] p-6">
-      <Card className="w-full max-w-2xl bg-white/45">
+    <main className="crm-shell-bg flex min-h-screen items-center justify-center p-6">
+      <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle>Connect {brand.companyName}</CardTitle>
           <CardDescription>The app is ready for real Supabase and OpenAI credentials.</CardDescription>

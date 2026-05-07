@@ -17,17 +17,17 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
+    <main className="crm-shell-bg flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-xl">
         <CardHeader>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-rose-600 text-white">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#D57D25] text-white">
             <AlertTriangle className="h-6 w-6" />
           </div>
           <CardTitle>Something Needs Attention</CardTitle>
           <CardDescription>The CRM hit an unexpected issue while loading this view.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <p className="text-sm leading-6 text-[#25425E]">
             Try again. If this continues, capture the time, page, and user action so an admin can review logs.
           </p>
           <Button onClick={reset}>

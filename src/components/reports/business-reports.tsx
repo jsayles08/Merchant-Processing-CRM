@@ -41,7 +41,7 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
               <CardTitle>Production Report</CardTitle>
               <CardDescription>Agent production, pipeline volume, and residual payout basis.</CardDescription>
             </div>
-            <Badge tone="emerald">{currency(totalResidual)} net residual</Badge>
+            <Badge tone="blue">{currency(totalResidual)} net residual</Badge>
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -55,7 +55,7 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
                 <th className="py-3">Agent payout</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-[#ABB7C0]/20">
               {agentRows.map((row) => (
                 <tr key={row.id}>
                   <td className="py-3 font-medium">{row.name}</td>
@@ -82,10 +82,10 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
         </CardHeader>
         <CardContent className="space-y-3">
           {staleLeads.map((merchant) => (
-            <div key={merchant.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+            <div key={merchant.id} className="crm-panel rounded-[24px] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-slate-950 dark:text-white">{merchant.business_name}</p>
+                  <p className="font-semibold text-[#0B0F15]">{merchant.business_name}</p>
                   <p className="mt-1 text-sm text-slate-500">{currency(merchant.monthly_volume_estimate)} monthly volume · {percent(merchant.proposed_rate)}</p>
                 </div>
                 <Badge tone="rose">{daysBetween(merchant.updated_at)}d stale</Badge>
@@ -93,7 +93,7 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
             </div>
           ))}
           {!staleLeads.length ? (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+            <div className="crm-panel flex items-center gap-2 rounded-[24px] p-4 text-sm text-[#25425E]">
               <AlertTriangle className="h-4 w-4" />
               No stale leads right now.
             </div>
@@ -111,15 +111,15 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
           </CardHeader>
           <CardContent className="space-y-3">
             {data.residualImportBatches.slice(0, 5).map((batch) => (
-              <div key={batch.id} className="rounded-lg border border-slate-200 p-4 text-sm dark:border-slate-800">
+              <div key={batch.id} className="crm-panel rounded-[24px] p-4 text-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-slate-950 dark:text-white">{batch.processor_name}</p>
+                    <p className="font-semibold text-[#0B0F15]">{batch.processor_name}</p>
                     <p className="mt-1 text-slate-500">{batch.statement_month} · {batch.imported_count} imported · {batch.error_count} issues</p>
                   </div>
-                  <Badge tone={batch.status === "completed" ? "emerald" : batch.status === "failed" ? "rose" : "amber"}>{batch.status}</Badge>
+                  <Badge tone={batch.status === "completed" ? "blue" : batch.status === "failed" ? "rose" : "amber"}>{batch.status}</Badge>
                 </div>
-                {batch.error_summary ? <p className="mt-3 whitespace-pre-line text-xs text-rose-600 dark:text-rose-300">{batch.error_summary}</p> : null}
+                {batch.error_summary ? <p className="mt-3 whitespace-pre-line text-xs text-[#D57D25]">{batch.error_summary}</p> : null}
               </div>
             ))}
             {!data.residualImportBatches.length ? <p className="text-sm text-slate-500">No processor imports yet.</p> : null}
@@ -132,12 +132,12 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
 
 function Summary({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-100 p-3 dark:border-slate-800">
+    <div className="crm-panel rounded-2xl p-3">
       <p className="flex items-center gap-2 text-xs font-medium uppercase text-slate-500">
         {icon}
         {label}
       </p>
-      <p className="mt-2 font-semibold text-slate-950 dark:text-white">{value}</p>
+      <p className="mt-2 font-semibold text-[#0B0F15]">{value}</p>
     </div>
   );
 }

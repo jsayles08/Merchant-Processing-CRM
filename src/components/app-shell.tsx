@@ -53,7 +53,7 @@ const railItems: NavItem[] = [
 ];
 
 const headerIconClassName =
-  "inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/45 text-slate-900 shadow-inner ring-1 ring-black/5 transition hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-black/20";
+  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ABB7C0]/25 bg-white/70 text-[#0B0F15] shadow-inner ring-1 ring-white/50 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#0E5EC9]/20";
 
 export function AppShell({
   children,
@@ -69,20 +69,20 @@ export function AppShell({
   activeHref?: string;
 }) {
   return (
-    <div className="min-h-screen bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] text-slate-950">
-      <div className="min-h-screen w-full overflow-hidden bg-[linear-gradient(120deg,rgba(220,238,255,0.98)_0%,rgba(237,248,229,0.98)_58%,rgba(255,246,223,0.98)_100%)]">
-        <header className="sticky top-0 z-30 border-b border-white/35 bg-white/25 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
+    <div className="crm-shell-bg min-h-screen text-[#0B0F15]">
+      <div className="min-h-screen w-full overflow-hidden">
+        <header className="sticky top-0 z-30 border-b border-white/65 bg-[#FDFDFD]/72 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-4">
               <Link href="/" className="group flex items-center gap-3">
-                <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white/55 shadow-inner ring-1 ring-black/5">
-                  <span className="absolute h-5 w-5 rounded-full bg-[#3157f6] opacity-95 transition group-hover:scale-110" />
-                  <span className="absolute h-5 w-5 translate-x-2 rounded-full bg-[#f7eb31] opacity-95 transition group-hover:scale-110" />
-                  <span className="relative text-sm font-black text-slate-950">{brand.initials.slice(0, 1)}</span>
+                <div className="relative flex h-11 w-11 items-center justify-center rounded-[18px] bg-white shadow-inner ring-1 ring-[#ABB7C0]/25">
+                  <span className="absolute h-5 w-5 rounded-full bg-[#0E5EC9] opacity-95 transition group-hover:scale-110" />
+                  <span className="absolute h-5 w-5 translate-x-2 rounded-full bg-[#D57D25] opacity-95 transition group-hover:scale-110" />
+                  <span className="relative text-sm font-black text-[#0B0F15]">{brand.initials.slice(0, 1)}</span>
                 </div>
                 <div>
-                  <p className="text-xl font-black text-slate-950">{brand.productName}</p>
-                  <p className="text-xs font-medium text-slate-500">{brand.companyName}</p>
+                  <p className="text-xl font-black text-[#0B0F15]">{brand.productName}</p>
+                  <p className="text-xs font-medium text-[#25425E]/70">{brand.companyName}</p>
                 </div>
               </Link>
 
@@ -94,9 +94,9 @@ export function AppShell({
                       key={item.href}
                       href={item.href}
                       className={`rounded-full px-5 py-3 text-sm font-semibold transition ${
-                        active
-                          ? "bg-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]"
-                          : "text-slate-700 hover:bg-white/50 hover:text-slate-950"
+                      active
+                        ? "bg-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]"
+                          : "text-[#25425E] hover:bg-white/70 hover:text-[#0B0F15]"
                       }`}
                     >
                       {item.label}
@@ -117,7 +117,7 @@ export function AppShell({
                 </Link>
                 {profile ? (
                   <div className="flex items-center gap-2 rounded-full bg-white/45 p-1.5 shadow-inner ring-1 ring-black/5">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7eb31] text-sm font-black text-slate-950">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E9D7A1] text-sm font-black text-[#0B0F15]">
                       {profile.full_name
                         .split(" ")
                         .map((part) => part[0])
@@ -137,8 +137,8 @@ export function AppShell({
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between xl:hidden">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-500">{eyebrow}</p>
-              <h1 className="text-2xl font-black text-slate-950">{title}</h1>
+              <p className="text-xs font-semibold uppercase text-[#25425E]/70">{eyebrow}</p>
+              <h1 className="text-2xl font-black text-[#0B0F15]">{title}</h1>
             </div>
             <nav className="flex gap-2 overflow-x-auto pb-1">
               {topNavItems.map((item) => {
@@ -149,7 +149,7 @@ export function AppShell({
                     key={item.href}
                     href={item.href}
                     className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
-                      active ? "bg-black text-white" : "bg-white/45 text-slate-700"
+                      active ? "bg-black text-white" : "bg-white/65 text-[#25425E]"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -162,7 +162,7 @@ export function AppShell({
         </header>
 
         <div className="relative">
-          <aside className="absolute left-5 top-12 z-20 hidden rounded-full bg-black/85 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:gap-2">
+          <aside className="absolute left-5 top-12 z-20 hidden rounded-full bg-[#0B0F15] p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:gap-2">
             {railItems.map((item) => {
               const Icon = item.icon;
               const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
@@ -173,7 +173,7 @@ export function AppShell({
                   aria-label={item.label}
                   title={item.label}
                   className={`flex h-11 w-11 items-center justify-center rounded-full transition ${
-                    active ? "bg-[#f7eb31] text-black" : "text-white/90 hover:bg-white/10 hover:text-white"
+                    active ? "bg-[#E9D7A1] text-[#0B0F15]" : "text-white/90 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -184,16 +184,16 @@ export function AppShell({
 
           <main className="min-h-[calc(100vh-8rem)] px-4 py-6 sm:px-6 lg:px-8 xl:pl-28">
             <div className="hidden pb-6 xl:block">
-              <p className="text-xs font-semibold uppercase text-slate-500">{eyebrow}</p>
-              <h1 className="mt-1 text-4xl font-black text-slate-950">{title}</h1>
+              <p className="text-xs font-semibold uppercase text-[#25425E]/70">{eyebrow}</p>
+              <h1 className="mt-1 text-4xl font-black text-[#0B0F15]">{title}</h1>
             </div>
             {children}
           </main>
         </div>
 
-        <div className="hidden border-t border-white/35 bg-white/20 px-8 py-3 text-xs font-medium text-slate-500 xl:flex xl:items-center xl:justify-between">
+        <div className="hidden border-t border-white/65 bg-[#FDFDFD]/48 px-8 py-3 text-xs font-medium text-[#25425E]/70 xl:flex xl:items-center xl:justify-between">
           <span className="inline-flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-[#3157f6]" />
+            <ShieldCheck className="h-4 w-4 text-[#0E5EC9]" />
             Production health and role-aware access enabled
           </span>
           <span>{brand.supportEmail}</span>

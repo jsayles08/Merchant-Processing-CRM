@@ -177,7 +177,7 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
               <Input type="password" value={form.temp_password} onChange={(event) => update("temp_password", event.target.value)} />
             </Field>
           </div>
-          {message ? <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{message}</p> : null}
+          {message ? <p className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">{message}</p> : null}
           <Button className="w-full" onClick={createUser} disabled={isPending}>
             <UserPlus className="h-4 w-4" />
             Create User
@@ -201,20 +201,20 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
               ))}
             </Select>
           </Field>
-          <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+          <div className="crm-panel max-h-72 space-y-2 overflow-y-auto rounded-[24px] p-2">
             {assignableProfiles.map((profile) => {
               const manager = data.profiles.find((item) => item.id === profile.manager_id);
               return (
-                <label key={profile.id} className="flex items-start gap-3 rounded-md p-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-900">
+                <label key={profile.id} className="flex items-start gap-3 rounded-2xl p-2 text-sm hover:bg-white/65">
                   <input
                     type="checkbox"
-                    className="mt-1 h-4 w-4 accent-emerald-600"
+                    className="mt-1 h-4 w-4 accent-[#0E5EC9]"
                     checked={selectedProfileIds.includes(profile.id)}
                     onChange={() => toggleProfile(profile.id)}
                   />
                   <span>
-                    <span className="block font-medium text-slate-950 dark:text-white">{profile.full_name}</span>
-                    <span className="text-slate-500">{profile.role} · {manager?.full_name ?? "No manager"}</span>
+                    <span className="block font-semibold text-[#0B0F15]">{profile.full_name}</span>
+                    <span className="text-[#25425E]/70">{profile.role} · {manager?.full_name ?? "No manager"}</span>
                   </span>
                 </label>
               );
@@ -269,16 +269,16 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
           {data.profiles.map((profile) => {
             const agent = data.agents.find((item) => item.profile_id === profile.id);
             return (
-              <div key={profile.id} className="grid gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800 md:grid-cols-[1fr_auto]">
+              <div key={profile.id} className="crm-panel grid gap-3 rounded-[24px] p-4 md:grid-cols-[1fr_auto]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-slate-950 dark:text-white">{profile.full_name}</p>
-                    <Badge tone={profile.role === "admin" ? "violet" : profile.role === "manager" ? "blue" : "emerald"}>{profile.role}</Badge>
+                    <p className="font-semibold text-[#0B0F15]">{profile.full_name}</p>
+                    <Badge tone={profile.role === "admin" ? "amber" : profile.role === "manager" ? "blue" : "slate"}>{profile.role}</Badge>
                     <Badge>{profile.status}</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">{profile.email}</p>
+                  <p className="mt-1 text-sm text-[#25425E]/70">{profile.email}</p>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-slate-500">
+                <div className="flex items-center gap-2 text-sm text-[#25425E]/70">
                   <KeyRound className="h-4 w-4" />
                   {agent?.agent_code ?? "No agent record"}
                 </div>

@@ -59,9 +59,9 @@ export function CompensationOverview({
             const memberProfile = data.profiles.find((item) => item.id === agent?.profile_id);
 
             return (
-              <div key={member.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3 text-sm">
+              <div key={member.id} className="crm-panel flex items-center justify-between rounded-2xl p-3 text-sm">
                 <span className="font-medium">{memberProfile?.full_name}</span>
-                <Badge tone={member.active_recruit_status ? "emerald" : "slate"}>
+                <Badge tone={member.active_recruit_status ? "blue" : "slate"}>
                   {member.active_recruit_status ? "Active" : "Not active"}
                 </Badge>
               </div>
@@ -76,9 +76,9 @@ export function CompensationOverview({
 
 function Rule({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 p-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-semibold text-slate-950">{value}</span>
+    <div className="crm-panel flex items-center justify-between gap-3 rounded-2xl p-3">
+      <span className="text-[#25425E]/70">{label}</span>
+      <span className="font-semibold text-[#0B0F15]">{value}</span>
     </div>
   );
 }

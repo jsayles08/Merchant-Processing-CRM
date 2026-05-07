@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
+    <main className="crm-shell-bg flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-xl">
         <CardHeader>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0B0F15] text-white">
             <SearchX className="h-6 w-6" />
           </div>
           <CardTitle>Page Not Found</CardTitle>
@@ -16,7 +16,7 @@ export default function NotFound() {
         <CardContent>
           <Link
             href="/"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-emerald-600 px-4 text-sm font-medium text-white shadow-sm shadow-emerald-950/10 transition hover:bg-emerald-700"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[#0B0F15] px-4 text-sm font-semibold text-white shadow-sm shadow-[#0B0F15]/10 transition hover:bg-[#25425E]"
           >
             Return to Dashboard
           </Link>

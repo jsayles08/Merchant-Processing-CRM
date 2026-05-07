@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f8f8f9;
+  --foreground: #0b0f15;
+  --crm-white: #fdfdfd;
+  --crm-gray: #abb7c0;
+  --crm-ink: #0b0f15;
+  --crm-slate: #25425e;
+  --crm-orange: #d57d25;
+  --crm-sand: #e9d7a1;
+  --crm-blue: #0e5ec9;
 }
 
 @theme inline {
@@ -10,13 +17,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #020617;
-    --foreground: #f8fafc;
-  }
 }
 
 body {
@@ -34,6 +34,30 @@ html {
 }
 
 ::selection {
-  background: #a7f3d0;
-  color: #064e3b;
+  background: var(--crm-sand);
+  color: var(--crm-ink);
+}
+
+.crm-shell-bg {
+  background:
+    radial-gradient(circle at 12% 12%, rgb(233 215 161 / 48%), transparent 28%),
+    radial-gradient(circle at 88% 18%, rgb(14 94 201 / 15%), transparent 32%),
+    linear-gradient(135deg, #fdfdfd 0%, #f4f6f7 46%, #e7ecef 100%);
+}
+
+.crm-card {
+  border: 1px solid rgb(255 255 255 / 80%);
+  background: rgb(253 253 253 / 78%);
+  box-shadow: 0 20px 54px rgb(11 15 21 / 8%);
+  backdrop-filter: blur(18px);
+}
+
+.crm-panel {
+  border: 1px solid rgb(171 183 192 / 34%);
+  background: rgb(255 255 255 / 58%);
+}
+
+.crm-soft {
+  background: rgb(255 255 255 / 44%);
+  border: 1px solid rgb(171 183 192 / 24%);
 }

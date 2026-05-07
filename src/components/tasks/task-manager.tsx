@@ -138,7 +138,7 @@ export function TaskManager({
               </Select>
             </Field>
           </div>
-          {message ? <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{message}</p> : null}
+          {message ? <p className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">{message}</p> : null}
           <Button className="w-full" onClick={createTask} disabled={isPending}>
             <Plus className="h-4 w-4" />
             Add Task
@@ -168,17 +168,17 @@ export function TaskManager({
             const merchant = data.merchants.find((item) => item.id === task.merchant_id);
             const assignee = data.profiles.find((item) => item.id === task.assigned_to);
             return (
-              <div key={task.id} className="grid gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-800 md:grid-cols-[1fr_auto]">
+              <div key={task.id} className="crm-panel grid gap-3 rounded-[24px] p-4 md:grid-cols-[1fr_auto]">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-slate-950 dark:text-white">{task.title}</p>
+                    <p className="font-semibold text-[#0B0F15]">{task.title}</p>
                     <Badge tone={task.priority === "high" ? "rose" : task.priority === "medium" ? "amber" : "slate"}>{task.priority}</Badge>
                     <Badge tone={task.status === "overdue" ? "rose" : "blue"}>{task.status}</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-[#25425E]/70">
                     {assignee?.full_name ?? "Unassigned"} · {merchant?.business_name ?? "No merchant"} · {new Date(task.due_date).toLocaleString()}
                   </p>
-                  {task.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{task.description}</p> : null}
+                  {task.description ? <p className="mt-2 text-sm text-[#25425E]">{task.description}</p> : null}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="secondary" disabled={isPending} onClick={() => updateStatus(task.id, "open")}>
@@ -198,7 +198,7 @@ export function TaskManager({
             <div className="pt-2">
               <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Recently completed</p>
               {completedTasks.map((task) => (
-                <div key={task.id} className="rounded-md border border-slate-100 p-3 text-sm text-slate-500 dark:border-slate-800">
+                <div key={task.id} className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]/70">
                   {task.title} · {titleCase(task.status)}
                 </div>
               ))}

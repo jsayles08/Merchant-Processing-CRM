@@ -2,14 +2,14 @@ import { type InputHTMLAttributes, type LabelHTMLAttributes, type SelectHTMLAttr
 import { cn } from "@/lib/utils";
 
 export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
-  return <label className={cn("text-sm font-medium text-slate-700 dark:text-slate-200", className)} {...props} />;
+  return <label className={cn("text-sm font-semibold text-[#25425E]", className)} {...props} />;
 }
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       className={cn(
-        "h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-800 dark:bg-slate-950 dark:text-white",
+        "h-10 w-full rounded-full border border-[#ABB7C0]/35 bg-white/75 px-3 text-sm text-[#0B0F15] outline-none transition placeholder:text-[#25425E]/45 focus:border-[#0E5EC9] focus:ring-2 focus:ring-[#0E5EC9]/15",
         className,
       )}
       {...props}
@@ -21,7 +21,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
   return (
     <textarea
       className={cn(
-        "min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-800 dark:bg-slate-950 dark:text-white",
+        "min-h-24 w-full rounded-[22px] border border-[#ABB7C0]/35 bg-white/75 px-3 py-2 text-sm text-[#0B0F15] outline-none transition placeholder:text-[#25425E]/45 focus:border-[#0E5EC9] focus:ring-2 focus:ring-[#0E5EC9]/15",
         className,
       )}
       {...props}
@@ -33,7 +33,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={cn(
-        "h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-slate-800 dark:bg-slate-950 dark:text-white",
+        "h-10 w-full rounded-full border border-[#ABB7C0]/35 bg-white/75 px-3 text-sm text-[#0B0F15] outline-none transition focus:border-[#0E5EC9] focus:ring-2 focus:ring-[#0E5EC9]/15",
         className,
       )}
       {...props}

@@ -22,10 +22,10 @@ async function ResetPasswordForm({ searchParams }: { searchParams: Promise<{ err
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] p-6">
-      <Card className="w-full max-w-md bg-white/45">
+    <main className="crm-shell-bg flex min-h-screen items-center justify-center p-6">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f7eb31] text-slate-950 shadow-inner ring-1 ring-black/5">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E9D7A1] text-[#0B0F15] shadow-inner ring-1 ring-black/5">
             <KeyRound className="h-6 w-6" />
           </div>
           <CardTitle>Set a New Password</CardTitle>

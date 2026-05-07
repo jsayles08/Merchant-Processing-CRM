@@ -10,10 +10,10 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-black text-white shadow-sm shadow-slate-950/20 hover:bg-slate-900",
-  secondary: "border border-white/55 bg-white/45 text-slate-800 shadow-sm hover:border-white hover:bg-white/70 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-slate-900",
-  ghost: "text-slate-600 hover:bg-white/45 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white",
-  danger: "bg-rose-600 text-white hover:bg-rose-700",
+  primary: "bg-[#0B0F15] text-white shadow-sm shadow-[#0B0F15]/20 hover:bg-[#25425E]",
+  secondary: "border border-[#ABB7C0]/35 bg-white/65 text-[#0B0F15] shadow-sm hover:border-[#ABB7C0]/70 hover:bg-white",
+  ghost: "text-[#25425E] hover:bg-white/60 hover:text-[#0B0F15]",
+  danger: "bg-[#D57D25] text-white hover:bg-[#b86419]",
 };
 
 const sizes: Record<ButtonSize, string> = {
@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50",
           variants[variant],
           sizes[size],
           className,

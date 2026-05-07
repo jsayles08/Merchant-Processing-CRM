@@ -4,12 +4,12 @@ import { cn } from "@/lib/utils";
 type BadgeTone = "slate" | "emerald" | "amber" | "rose" | "blue" | "violet";
 
 const tones: Record<BadgeTone, string> = {
-  slate: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200",
-  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
-  amber: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300",
-  rose: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300",
-  blue: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300",
-  violet: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300",
+  slate: "border-[#ABB7C0]/35 bg-white/70 text-[#25425E]",
+  emerald: "border-[#0E5EC9]/20 bg-[#0E5EC9]/10 text-[#0E5EC9]",
+  amber: "border-[#E9D7A1]/70 bg-[#E9D7A1]/55 text-[#6F461D]",
+  rose: "border-[#D57D25]/25 bg-[#D57D25]/12 text-[#9F4E16]",
+  blue: "border-[#0E5EC9]/20 bg-[#0E5EC9]/10 text-[#0E5EC9]",
+  violet: "border-[#ABB7C0]/45 bg-[#25425E]/10 text-[#25425E]",
 };
 
 export function Badge({
@@ -20,7 +20,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold",
         tones[tone],
         className,
       )}

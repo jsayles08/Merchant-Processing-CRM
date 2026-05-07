@@ -57,7 +57,7 @@ export function ResidualImporter() {
             placeholder="business_name,processing_volume,net_residual&#10;Acme LLC,125000,1850"
           />
         </Field>
-        {message ? <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">{message}</p> : null}
+        {message ? <p className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">{message}</p> : null}
         <Button className="w-full" onClick={importResiduals} disabled={isPending || !csvText.trim()}>
           <Upload className="h-4 w-4" />
           Import Residuals
@@ -75,4 +75,3 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
-

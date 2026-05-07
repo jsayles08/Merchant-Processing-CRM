@@ -17,11 +17,11 @@ export function MetricCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">{value}</p>
-            <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">{delta}</p>
+            <p className="text-sm text-[#25425E]/70">{label}</p>
+            <p className="mt-2 text-2xl font-semibold text-[#0B0F15]">{value}</p>
+            <p className="mt-2 text-xs text-[#D57D25]">{delta}</p>
           </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-emerald-700 dark:border-slate-800 dark:bg-slate-900 dark:text-emerald-300">
+          <div className="rounded-2xl border border-[#ABB7C0]/25 bg-white/70 p-2 text-[#0E5EC9]">
             {icon}
           </div>
         </div>

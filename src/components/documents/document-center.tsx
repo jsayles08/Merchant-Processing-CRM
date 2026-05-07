@@ -41,7 +41,7 @@ export function DocumentCenter({ data }: { data: CrmData }) {
 
   return (
     <section id="documents" className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <Card className="bg-white/38 backdrop-blur-xl">
+      <Card>
         <CardHeader>
           <CardTitle>Document Center</CardTitle>
           <CardDescription>Merchant files organized by account and document type.</CardDescription>
@@ -54,7 +54,7 @@ export function DocumentCenter({ data }: { data: CrmData }) {
               <Link
                 key={document.id}
                 href={merchant ? `/merchants/${merchant.id}` : "/merchants"}
-                className="grid gap-3 rounded-3xl border border-white/55 bg-white/35 p-4 transition hover:bg-white/60 md:grid-cols-[1fr_auto]"
+                className="crm-panel grid gap-3 rounded-3xl p-4 transition hover:bg-white/70 md:grid-cols-[1fr_auto]"
               >
                 <div className="flex min-w-0 gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black text-white">
@@ -66,7 +66,7 @@ export function DocumentCenter({ data }: { data: CrmData }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 md:justify-end">
-                  <Badge className="rounded-full bg-[#3157f6] text-white">{document.document_type}</Badge>
+                  <Badge className="rounded-full bg-[#0E5EC9] text-white">{document.document_type}</Badge>
                   <span className="text-xs text-slate-500">{new Date(document.created_at).toLocaleDateString()}</span>
                 </div>
               </Link>
@@ -77,7 +77,7 @@ export function DocumentCenter({ data }: { data: CrmData }) {
       </Card>
 
       <div className="space-y-6">
-        <Card className="bg-white/38 backdrop-blur-xl">
+        <Card>
           <CardHeader>
             <CardTitle>Upload Document</CardTitle>
             <CardDescription>Attach merchant files to private Supabase storage.</CardDescription>
@@ -124,7 +124,7 @@ export function DocumentCenter({ data }: { data: CrmData }) {
           </CardContent>
         </Card>
 
-        <Card className="bg-white/38 backdrop-blur-xl">
+        <Card>
           <CardHeader>
             <CardTitle>Storage Status</CardTitle>
             <CardDescription>Private storage paths keep merchant files away from public URLs.</CardDescription>
@@ -142,7 +142,7 @@ export function DocumentCenter({ data }: { data: CrmData }) {
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/55 bg-white/35 p-3">
+    <div className="crm-panel flex items-center justify-between rounded-2xl p-3">
       <span className="text-slate-500">{label}</span>
       <span className="font-semibold text-slate-950">{value}</span>
     </div>

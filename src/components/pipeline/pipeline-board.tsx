@@ -54,7 +54,7 @@ export function PipelineBoard({ data }: { data: CrmData }) {
               <CardTitle>Deal Pipeline</CardTitle>
               <CardDescription>Kanban-style acquisition flow with rate flags and follow-up context.</CardDescription>
             </div>
-            <Badge tone="emerald">Drag-ready board</Badge>
+            <Badge tone="blue">Drag-ready board</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -86,16 +86,16 @@ function StaticPipeline({ merchants, agentNames }: { merchants: Merchant[]; agen
         const stageMerchants = merchants.filter((merchant) => merchant.status === stage.id);
 
         return (
-          <div key={stage.id} className="min-h-56 min-w-72 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+          <div key={stage.id} className="crm-panel min-h-56 min-w-72 rounded-[24px] p-3">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{stage.label}</h3>
+              <h3 className="text-sm font-semibold text-[#0B0F15]">{stage.label}</h3>
               <Badge>{stageMerchants.length}</Badge>
             </div>
             <div className="space-y-3">
               {stageMerchants.map((merchant) => (
-                <article key={merchant.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-                  <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{merchant.business_name}</p>
-                  <p className="mt-1 text-xs text-slate-500">{agentNames.get(merchant.assigned_agent_id) ?? "Unassigned"}</p>
+                <article key={merchant.id} className="rounded-[22px] border border-[#ABB7C0]/25 bg-white/80 p-3 shadow-sm">
+                  <p className="truncate text-sm font-semibold text-[#0B0F15]">{merchant.business_name}</p>
+                  <p className="mt-1 text-xs text-[#25425E]/70">{agentNames.get(merchant.assigned_agent_id) ?? "Unassigned"}</p>
                 </article>
               ))}
             </div>
@@ -123,14 +123,14 @@ function StageColumn({
     <div
       ref={setNodeRef}
       id={id}
-      className={`min-h-56 min-w-72 rounded-lg border p-3 transition ${
+      className={`min-h-56 min-w-72 rounded-[24px] border p-3 transition ${
         isOver
-          ? "border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
-          : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50"
+          ? "border-[#0E5EC9]/45 bg-[#0E5EC9]/8"
+          : "border-[#ABB7C0]/25 bg-white/50"
       }`}
     >
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+        <h3 className="text-sm font-semibold text-[#0B0F15]">{title}</h3>
         <Badge>{merchants.length}</Badge>
       </div>
       <div className="space-y-3">
@@ -154,7 +154,7 @@ function MerchantPipelineCard({ merchant, agentName }: { merchant: Merchant; age
     <article
       ref={setNodeRef}
       style={style}
-      className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition dark:border-slate-800 dark:bg-slate-950 ${
+      className={`rounded-[22px] border border-[#ABB7C0]/25 bg-white/82 p-3 shadow-sm transition ${
         isDragging ? "relative z-20 opacity-80 shadow-lg" : ""
       }`}
       {...listeners}
@@ -162,10 +162,10 @@ function MerchantPipelineCard({ merchant, agentName }: { merchant: Merchant; age
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{merchant.business_name}</p>
-          <p className="mt-1 text-xs text-slate-500">{agentName}</p>
+          <p className="truncate text-sm font-semibold text-[#0B0F15]">{merchant.business_name}</p>
+          <p className="mt-1 text-xs text-[#25425E]/70">{agentName}</p>
         </div>
-        <GripVertical className="h-4 w-4 shrink-0 text-slate-400" />
+        <GripVertical className="h-4 w-4 shrink-0 text-[#ABB7C0]" />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <MiniMetric label="Volume" value={currency(merchant.monthly_volume_estimate)} />
@@ -183,9 +183,9 @@ function MerchantPipelineCard({ merchant, agentName }: { merchant: Merchant; age
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 p-2 dark:bg-slate-900">
-      <p className="text-slate-500 dark:text-slate-400">{label}</p>
-      <p className="mt-1 font-semibold text-slate-900 dark:text-white">{value}</p>
+    <div className="rounded-2xl bg-[#FDFDFD]/70 p-2">
+      <p className="text-[#25425E]/65">{label}</p>
+      <p className="mt-1 font-semibold text-[#0B0F15]">{value}</p>
     </div>
   );
 }

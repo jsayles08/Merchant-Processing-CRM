@@ -56,7 +56,7 @@ export function ApprovalQueue({
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
           {message ? (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 lg:col-span-2">
+            <div className="crm-panel rounded-2xl p-3 text-sm text-[#25425E] lg:col-span-2">
               {message}
             </div>
           ) : null}
@@ -66,11 +66,11 @@ export function ApprovalQueue({
             const profile = profiles.find((item) => item.id === agent?.profile_id);
 
             return (
-              <div key={deal.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+              <div key={deal.id} className="crm-panel rounded-[24px] p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <p className="font-semibold text-slate-950 dark:text-white">{merchant?.business_name}</p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    <p className="font-semibold text-[#0B0F15]">{merchant?.business_name}</p>
+                    <p className="mt-1 text-sm text-[#25425E]/70">
                       {profile?.full_name ?? "Unassigned"} · {currency(deal.estimated_monthly_volume)} volume
                     </p>
                   </div>
@@ -78,7 +78,7 @@ export function ApprovalQueue({
                 </div>
 
                 {currentRole === "agent" ? (
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Waiting for manager approval.</p>
+                  <p className="mt-4 text-sm text-[#25425E]/70">Waiting for manager approval.</p>
                 ) : (
                   <div className="mt-4 flex gap-2">
                     <Button

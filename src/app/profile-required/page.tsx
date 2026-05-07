@@ -2,8 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function ProfileRequiredPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] p-6">
-      <Card className="w-full max-w-xl bg-white/45">
+    <main className="crm-shell-bg flex min-h-screen items-center justify-center p-6">
+      <Card className="w-full max-w-xl">
         <CardHeader>
           <CardTitle>Profile Required</CardTitle>
           <CardDescription>Your login is valid, but no MerchantDesk role profile is attached yet.</CardDescription>

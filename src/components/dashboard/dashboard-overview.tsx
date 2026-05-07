@@ -10,13 +10,18 @@ import {
   ClipboardList,
   Edit3,
   ExternalLink,
+  FileCheck2,
   Mail,
   Maximize2,
   MoreHorizontal,
   Phone,
   Plus,
+  ReceiptText,
   Share2,
+  ShieldCheck,
   SlidersHorizontal,
+  UploadCloud,
+  UserCog,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -33,13 +38,13 @@ type InteractionCard = {
 
 const dealPalettes = [
   {
-    card: "bg-[#3157f6] text-white shadow-[0_20px_42px_rgba(49,87,246,0.24)]",
+    card: "bg-[#0E5EC9] text-white shadow-[0_20px_42px_rgba(14,94,201,0.24)]",
     muted: "text-blue-100",
     chip: "bg-white/12 text-white",
   },
   {
-    card: "bg-[#4f9caf] text-white shadow-[0_20px_42px_rgba(79,156,175,0.22)]",
-    muted: "text-cyan-50",
+    card: "bg-[#25425E] text-white shadow-[0_20px_42px_rgba(37,66,94,0.22)]",
+    muted: "text-slate-200",
     chip: "bg-white/15 text-white",
   },
   {
@@ -48,8 +53,8 @@ const dealPalettes = [
     chip: "bg-white/12 text-white",
   },
   {
-    card: "bg-[#f7eb31] text-slate-950 shadow-[0_20px_42px_rgba(247,235,49,0.20)]",
-    muted: "text-slate-700",
+    card: "bg-[#E9D7A1] text-[#0B0F15] shadow-[0_20px_42px_rgba(213,125,37,0.16)]",
+    muted: "text-[#25425E]",
     chip: "bg-black/8 text-slate-950",
   },
   {
@@ -116,6 +121,9 @@ export function DashboardOverview({ data }: { data: CrmData }) {
   const activeTasks = data.tasks.filter((task) => task.status !== "completed").length;
   const recentMerchants = data.merchants.filter((merchant) => daysBetween(merchant.created_at) <= 7).length;
   const totalWonResidual = data.residuals.reduce((sum, residual) => sum + residual.net_residual, 0);
+  const pendingApprovals = data.deals.filter((deal) => deal.approval_status === "pending").length;
+  const underwritingCount = data.merchants.filter((merchant) => merchant.status === "underwriting").length;
+  const processorImportIssues = data.residualImportBatches.reduce((sum, batch) => sum + batch.error_count, 0);
 
   const stageRows = pipelineStages
     .map((stage) => {
@@ -173,21 +181,21 @@ export function DashboardOverview({ data }: { data: CrmData }) {
             value={currency(totalWonResidual || processingVolume)}
             label="Won from live deals"
             accent="+11% week"
-            accentClassName="bg-[#f7eb31] text-slate-950"
+            accentClassName="bg-[#E9D7A1] text-[#0B0F15]"
           />
           <StatPill
             icon={<UserRound className="h-5 w-5" />}
             value={`+${recentMerchants || data.merchants.length}`}
             label="New customers"
             accent="+12 today"
-            accentClassName="bg-[#3157f6] text-white"
+            accentClassName="bg-[#0E5EC9] text-white"
           />
           <StatPill
             icon={<ClipboardList className="h-5 w-5" />}
             value={`+${activeTasks}`}
             label="New tasks"
             accent="+6 today"
-            accentClassName="bg-white/70 text-slate-700"
+            accentClassName="bg-white/75 text-[#25425E]"
           />
         </div>
 
@@ -196,6 +204,13 @@ export function DashboardOverview({ data }: { data: CrmData }) {
             {actionMessage}
           </div>
         ) : null}
+
+        <ProcessingWorkbench
+          pendingApprovals={pendingApprovals}
+          underwritingCount={underwritingCount}
+          documentCount={data.documents.length}
+          processorImportIssues={processorImportIssues}
+        />
 
         <Panel
           title="Interaction History"
@@ -273,11 +288,11 @@ export function DashboardOverview({ data }: { data: CrmData }) {
                 const active = [4, 11, 12, 16, 23, 27].includes(day);
                 const color =
                   day === 4 || day === 23
-                    ? "bg-[#3157f6] text-white"
+                    ? "bg-[#0E5EC9] text-white"
                     : day === 11 || day === 27
-                      ? "bg-[#f7eb31] text-slate-950"
+                      ? "bg-[#E9D7A1] text-[#0B0F15]"
                       : day === 16
-                        ? "bg-[#4f9caf] text-white"
+                        ? "bg-[#D57D25] text-white"
                         : day === 12
                           ? "bg-[#eadca0] text-slate-950"
                           : "bg-white/32 text-slate-500";
@@ -404,12 +419,84 @@ export function DashboardOverview({ data }: { data: CrmData }) {
 
 function Panel({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-[34px] border border-white/55 bg-white/38 p-5 shadow-[0_20px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+    <div className="crm-card rounded-[34px] p-5">
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-bold text-slate-950">{title}</h2>
+        <h2 className="text-lg font-bold text-[#0B0F15]">{title}</h2>
         {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
       </div>
       {children}
+    </div>
+  );
+}
+
+function ProcessingWorkbench({
+  pendingApprovals,
+  underwritingCount,
+  documentCount,
+  processorImportIssues,
+}: {
+  pendingApprovals: number;
+  underwritingCount: number;
+  documentCount: number;
+  processorImportIssues: number;
+}) {
+  const actions = [
+    {
+      label: "Pricing approvals",
+      value: pendingApprovals.toString(),
+      helper: "Manager queue",
+      href: "/opportunities#approval-requests",
+      icon: <ShieldCheck className="h-4 w-4" />,
+      tone: "bg-[#0E5EC9] text-white",
+    },
+    {
+      label: "Underwriting desk",
+      value: underwritingCount.toString(),
+      helper: "Apps in review",
+      href: "/opportunities",
+      icon: <FileCheck2 className="h-4 w-4" />,
+      tone: "bg-[#25425E] text-white",
+    },
+    {
+      label: "Document vault",
+      value: documentCount.toString(),
+      helper: "Private files",
+      href: "/documents",
+      icon: <UploadCloud className="h-4 w-4" />,
+      tone: "bg-[#D57D25] text-white",
+    },
+    {
+      label: "Residual import",
+      value: processorImportIssues.toString(),
+      helper: "Exceptions",
+      href: "/reports",
+      icon: <ReceiptText className="h-4 w-4" />,
+      tone: "bg-[#E9D7A1] text-[#0B0F15]",
+    },
+    {
+      label: "Agent access",
+      value: "Admin",
+      helper: "Teams and roles",
+      href: "/settings",
+      icon: <UserCog className="h-4 w-4" />,
+      tone: "bg-black text-white",
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 md:grid-cols-5">
+      {actions.map((action) => (
+        <Link
+          key={action.label}
+          href={action.href}
+          className="crm-card group rounded-[28px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_24px_58px_rgba(11,15,21,0.12)] focus:outline-none focus:ring-2 focus:ring-[#0E5EC9]/25"
+        >
+          <div className={`mb-5 flex h-10 w-10 items-center justify-center rounded-full ${action.tone}`}>{action.icon}</div>
+          <p className="text-2xl font-black text-[#0B0F15]">{action.value}</p>
+          <p className="mt-1 text-sm font-bold text-[#0B0F15]">{action.label}</p>
+          <p className="text-xs font-medium text-[#25425E]/65">{action.helper}</p>
+        </Link>
+      ))}
     </div>
   );
 }
@@ -478,7 +565,7 @@ function CustomerCard({
   const taskHref = `/tasks?merchant=${encodeURIComponent(merchant.id)}`;
 
   return (
-    <div className="rounded-[34px] border border-white/55 bg-white/38 p-6 text-center shadow-[0_20px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+    <div className="crm-card rounded-[34px] p-6 text-center">
       <div className="mb-5 flex items-center justify-between">
         <div className="flex gap-2">
           <IconButton label="Share contact" onClick={onShare}>
@@ -498,14 +585,14 @@ function CustomerCard({
         </div>
       </div>
 
-      <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_25%,#fff_0,#fff_24%,#f5a3bc_25%,#f5a3bc_52%,#3157f6_53%,#3157f6_100%)] text-3xl font-black text-white shadow-[0_18px_45px_rgba(49,87,246,0.18)]">
+      <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-[radial-gradient(circle_at_30%_25%,#fff_0,#fff_24%,#E9D7A1_25%,#E9D7A1_52%,#D57D25_53%,#0E5EC9_100%)] text-3xl font-black text-white shadow-[0_18px_45px_rgba(14,94,201,0.18)]">
         {initials(merchant.contact_name || merchant.business_name)}
       </div>
       <h2 className="mt-6 text-2xl font-black text-slate-950">{merchant.contact_name || merchant.business_name}</h2>
       <p className="mx-auto mt-2 max-w-xs text-sm leading-5 text-slate-500">
         {merchant.industry || "Merchant"} contact at {merchant.business_name}
       </p>
-      <Badge className="mt-4 rounded-full border-black/10 bg-white/45 text-slate-700">
+      <Badge className="mt-4 rounded-full border-black/10 bg-white/65 text-[#25425E]">
         {titleCase(deal?.stage ?? merchant.status)}
       </Badge>
 
@@ -601,7 +688,7 @@ function StatPill({
 }
 
 function controlClassName() {
-  return "flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/35 text-slate-950 transition hover:bg-white/65 focus:outline-none focus:ring-2 focus:ring-black/20";
+  return "flex h-11 w-11 items-center justify-center rounded-full border border-[#ABB7C0]/30 bg-white/55 text-[#0B0F15] transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#0E5EC9]/20";
 }
 
 function IconButton({ label, children, onClick }: { label: string; children: ReactNode; onClick: () => void }) {

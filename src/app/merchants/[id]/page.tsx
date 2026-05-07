@@ -38,7 +38,7 @@ export default async function MerchantProfilePage({
   return (
     <AppShell profile={profile} title={detail.merchant.business_name} eyebrow="Merchant profile" activeHref="/merchants">
       <div className="w-full space-y-6">
-        <Link href="/merchants" className="inline-flex items-center gap-2 rounded-full bg-white/45 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-white/70">
+        <Link href="/merchants" className="inline-flex items-center gap-2 rounded-full border border-[#ABB7C0]/25 bg-white/70 px-4 py-2 text-sm font-semibold text-[#0B0F15] transition hover:bg-white">
           <ArrowLeft className="h-4 w-4" />
           Back to merchants
         </Link>
@@ -51,7 +51,7 @@ export default async function MerchantProfilePage({
                   <CardTitle>{detail.merchant.business_name}</CardTitle>
                   <CardDescription>{detail.merchant.industry ?? "Merchant"} profile and onboarding workspace</CardDescription>
                 </div>
-                <Badge tone={detail.merchant.status === "processing" ? "emerald" : "blue"}>
+                <Badge tone={detail.merchant.status === "processing" ? "blue" : "slate"}>
                   {titleCase(detail.merchant.status)}
                 </Badge>
               </div>
@@ -73,9 +73,9 @@ export default async function MerchantProfilePage({
               <CardTitle>Copilot Summary</CardTitle>
               <CardDescription>Account risk, next step, and missing information.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <CardContent className="space-y-3 text-sm leading-6 text-[#25425E]">
               <p>{detail.merchant.notes || "No notes have been added for this merchant yet."}</p>
-              <div className="rounded-2xl border border-white/55 bg-white/35 p-3">
+              <div className="crm-panel rounded-2xl p-3">
                 Next recommended action: confirm current processor statements, then schedule underwriting or onboarding
                 follow-up based on stage.
               </div>
@@ -116,12 +116,12 @@ export default async function MerchantProfilePage({
 
               <div className="space-y-3">
                 {detail.updates.map((update) => (
-                  <div key={update.id} className="rounded-2xl border border-white/55 bg-white/35 p-3 text-sm">
+                  <div key={update.id} className="crm-panel rounded-2xl p-3 text-sm">
                     <div className="flex items-center justify-between gap-3">
                       <Badge>{titleCase(update.update_type)}</Badge>
-                      <span className="text-xs text-slate-500">{new Date(update.created_at).toLocaleString()}</span>
+                      <span className="text-xs text-[#25425E]/65">{new Date(update.created_at).toLocaleString()}</span>
                     </div>
-                    <p className="mt-2 text-slate-600 dark:text-slate-300">{update.note}</p>
+                    <p className="mt-2 text-[#25425E]">{update.note}</p>
                   </div>
                 ))}
               </div>
@@ -164,10 +164,10 @@ export default async function MerchantProfilePage({
                     href={document.file_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="block rounded-2xl border border-white/55 bg-white/35 p-3 text-sm transition hover:bg-white/60"
+                    className="crm-panel block rounded-2xl p-3 text-sm transition hover:bg-white/70"
                   >
-                    <p className="font-medium text-slate-950 dark:text-white">{document.file_name}</p>
-                    <p className="mt-1 text-slate-500">{document.document_type}</p>
+                    <p className="font-semibold text-[#0B0F15]">{document.file_name}</p>
+                    <p className="mt-1 text-[#25425E]/70">{document.document_type}</p>
                   </a>
                 ))}
               </div>
@@ -181,12 +181,12 @@ export default async function MerchantProfilePage({
 
 function Info({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/55 bg-white/35 p-3">
-      <p className="flex items-center gap-2 text-xs font-medium uppercase text-slate-500">
+    <div className="crm-panel rounded-2xl p-3">
+      <p className="flex items-center gap-2 text-xs font-medium uppercase text-[#25425E]/70">
         {icon}
         {label}
       </p>
-      <p className="mt-2 font-semibold text-slate-950 dark:text-white">{value}</p>
+      <p className="mt-2 font-semibold text-[#0B0F15]">{value}</p>
     </div>
   );
 }

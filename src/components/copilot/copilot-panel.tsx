@@ -118,12 +118,12 @@ export function CopilotPanel({
           <CardDescription>Plain English CRM updates with structured action suggestions.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/60">
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+          <div className="crm-panel rounded-[24px] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#0E5EC9]">
               <Sparkles className="h-4 w-4" />
               OpenAI route included
             </div>
-            <p className="mt-2 text-sm leading-6 text-emerald-800 dark:text-emerald-200">
+            <p className="mt-2 text-sm leading-6 text-[#25425E]">
               Messages and suggested actions persist in Supabase. Major writes stay pending until you confirm them.
             </p>
           </div>
@@ -132,7 +132,7 @@ export function CopilotPanel({
               <button
                 key={example}
                 onClick={() => setInput(example)}
-                className="w-full rounded-md border border-slate-200 bg-white p-3 text-left text-sm text-slate-600 transition hover:border-emerald-300 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-emerald-800"
+                className="crm-panel w-full rounded-[20px] p-3 text-left text-sm text-[#25425E] transition hover:bg-white/70 hover:text-[#0B0F15]"
               >
                 {example}
               </button>
@@ -160,29 +160,29 @@ export function CopilotPanel({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="h-[420px] space-y-4 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="crm-panel h-[420px] space-y-4 overflow-y-auto rounded-[24px] p-4">
             {messages.map((message) => (
               <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 {message.role === "assistant" ? <Avatar icon={<Bot className="h-4 w-4" />} /> : null}
-                <div className={`max-w-[82%] rounded-lg border p-3 text-sm leading-6 ${message.role === "user" ? "border-emerald-200 bg-emerald-600 text-white" : "border-slate-200 bg-white text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"}`}>
+                <div className={`max-w-[82%] rounded-[22px] border p-3 text-sm leading-6 ${message.role === "user" ? "border-[#0E5EC9]/20 bg-[#0E5EC9] text-white" : "border-[#ABB7C0]/25 bg-white text-[#25425E]"}`}>
                   {message.content}
                   {message.actions?.length ? (
                     <div className="mt-3 space-y-2">
                       {message.actions.map((action) => (
-                        <div key={action.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+                        <div key={action.id} className="flex items-center justify-between gap-2 rounded-2xl border border-[#ABB7C0]/25 bg-[#FDFDFD] px-2 py-1.5 text-xs text-[#25425E]">
                           <span className="flex min-w-0 items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#0E5EC9]" />
                             <span className="truncate">{action.action_summary}</span>
                           </span>
                           {action.status === "requires_confirmation" ? (
                             <button
-                              className="shrink-0 rounded bg-emerald-600 px-2 py-1 font-medium text-white"
+                              className="shrink-0 rounded-full bg-[#0B0F15] px-2 py-1 font-semibold text-white"
                               onClick={() => void confirmAction(action.id)}
                             >
                               Confirm
                             </button>
                           ) : (
-                            <Badge tone={action.status === "completed" ? "emerald" : "slate"}>{action.status}</Badge>
+                            <Badge tone={action.status === "completed" ? "blue" : "slate"}>{action.status}</Badge>
                           )}
                         </div>
                       ))}
@@ -194,7 +194,7 @@ export function CopilotPanel({
             ))}
             {isLoading ? (
               <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Lightbulb className="h-4 w-4 animate-pulse text-emerald-600" />
+                <Lightbulb className="h-4 w-4 animate-pulse text-[#D57D25]" />
                 Copilot is structuring the update...
               </div>
             ) : null}
@@ -218,7 +218,7 @@ export function CopilotPanel({
             </Button>
           </div>
           {statusMessage ? (
-            <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+            <p className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">
               {statusMessage}
             </p>
           ) : null}
@@ -230,7 +230,7 @@ export function CopilotPanel({
 
 function Avatar({ icon }: { icon: React.ReactNode }) {
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border border-[#ABB7C0]/25 bg-white text-[#25425E]">
       {icon}
     </div>
   );
