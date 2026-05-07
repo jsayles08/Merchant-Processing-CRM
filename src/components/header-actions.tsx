@@ -22,10 +22,10 @@ export function HeaderActions() {
 
   return (
     <>
-      <label className="relative block sm:w-72">
+      <label className="relative hidden 2xl:block 2xl:w-72">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
-          className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/15"
+          className="h-11 w-full rounded-full border border-white/55 bg-white/45 pl-9 pr-3 text-sm font-medium text-slate-800 outline-none shadow-inner transition placeholder:text-slate-500 focus:border-white focus:bg-white/75 focus:ring-2 focus:ring-[#3157f6]/20"
           placeholder="Search merchants, agents, deals"
           value={query}
           onChange={(event) => updateSearch(event.target.value)}
@@ -36,11 +36,11 @@ export function HeaderActions() {
           }}
         />
       </label>
-      <Button variant="secondary" type="button" onClick={() => router.push("/copilot")}>
+      <Button className="whitespace-nowrap rounded-full" variant="secondary" type="button" onClick={() => router.push("/copilot")}>
         <Bot className="h-4 w-4" />
         Ask Copilot
       </Button>
-      <Button type="button" onClick={() => router.push("/merchants#add-merchant")}>
+      <Button className="whitespace-nowrap rounded-full" type="button" onClick={() => router.push("/merchants#add-merchant")}>
         <Plus className="h-4 w-4" />
         Add Merchant
       </Button>

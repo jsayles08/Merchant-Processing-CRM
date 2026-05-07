@@ -2,17 +2,23 @@ import Link from "next/link";
 import {
   BarChart3,
   Bell,
-  Bot,
   BriefcaseBusiness,
+  CalendarDays,
   ClipboardList,
-  FileText,
+  Database,
   Gauge,
   HandCoins,
-  HelpCircle,
   LayoutDashboard,
   LogOut,
+  Mail,
+  Plus,
+  Search,
+  Send,
   Settings,
+  Share2,
   ShieldCheck,
+  Star,
+  Upload,
 } from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
 import { HeaderActions } from "@/components/header-actions";
@@ -26,31 +32,25 @@ type NavItem = {
   href: string;
 };
 
-const navGroups: { label: string; items: NavItem[] }[] = [
-  {
-    label: "Workspace",
-    items: [
-      { label: "Dashboard", icon: LayoutDashboard, href: "/" },
-      { label: "Tasks", icon: ClipboardList, href: "/tasks" },
-      { label: "Agent Copilot", icon: Bot, href: "/copilot" },
-    ],
-  },
-  {
-    label: "Sales",
-    items: [
-      { label: "Merchants", icon: BriefcaseBusiness, href: "/merchants" },
-      { label: "Opportunities", icon: Gauge, href: "/opportunities" },
-      { label: "Documents", icon: FileText, href: "/documents" },
-    ],
-  },
-  {
-    label: "Business",
-    items: [
-      { label: "Reports", icon: BarChart3, href: "/reports" },
-      { label: "Compensation", icon: HandCoins, href: "/compensation" },
-      { label: "Settings", icon: Settings, href: "/settings" },
-    ],
-  },
+const topNavItems: NavItem[] = [
+  { label: "Dashboard", icon: LayoutDashboard, href: "/" },
+  { label: "Merchants", icon: BriefcaseBusiness, href: "/merchants" },
+  { label: "Opportunities", icon: Gauge, href: "/opportunities" },
+  { label: "Tasks", icon: ClipboardList, href: "/tasks" },
+  { label: "Reports", icon: BarChart3, href: "/reports" },
+];
+
+const railItems: NavItem[] = [
+  { label: "Search merchants", icon: Search, href: "/merchants" },
+  { label: "Opportunities", icon: Share2, href: "/opportunities" },
+  { label: "Documents", icon: Upload, href: "/documents" },
+  { label: "Reports", icon: Star, href: "/reports" },
+  { label: "Add merchant", icon: Plus, href: "/merchants#add-merchant" },
+  { label: "Compensation", icon: HandCoins, href: "/compensation" },
+  { label: "Data room", icon: Database, href: "/documents" },
+  { label: "Tasks", icon: CalendarDays, href: "/tasks" },
+  { label: "Copilot", icon: Send, href: "/copilot" },
+  { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 export function AppShell({
@@ -67,112 +67,135 @@ export function AppShell({
   activeHref?: string;
 }) {
   return (
-    <div className="min-h-screen bg-[#eef1f4] p-3 text-slate-950 sm:p-4">
-      <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1800px] overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.10)] sm:min-h-[calc(100vh-2rem)]">
-        <aside className="hidden w-72 shrink-0 flex-col bg-[#171a33] text-slate-200 lg:flex">
-          <div className="flex items-center gap-3 px-5 py-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500 text-sm font-bold text-white shadow-lg shadow-indigo-950/30">
-              {brand.initials}
+    <div className="min-h-screen bg-[#b6b7c0] p-3 text-slate-950 sm:p-5 lg:p-8">
+      <div className="mx-auto min-h-[calc(100vh-1.5rem)] max-w-[1840px] overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] shadow-[0_28px_90px_rgba(17,24,39,0.22)] sm:min-h-[calc(100vh-2.5rem)] lg:min-h-[calc(100vh-4rem)]">
+        <header className="sticky top-0 z-30 border-b border-white/35 bg-white/25 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <Link href="/" className="group flex items-center gap-3">
+                <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white/55 shadow-inner ring-1 ring-black/5">
+                  <span className="absolute h-5 w-5 rounded-full bg-[#3157f6] opacity-95 transition group-hover:scale-110" />
+                  <span className="absolute h-5 w-5 translate-x-2 rounded-full bg-[#f7eb31] opacity-95 transition group-hover:scale-110" />
+                  <span className="relative text-sm font-black text-slate-950">{brand.initials.slice(0, 1)}</span>
+                </div>
+                <div>
+                  <p className="text-xl font-black text-slate-950">{brand.productName}</p>
+                  <p className="text-xs font-medium text-slate-500">{brand.companyName}</p>
+                </div>
+              </Link>
+
+              <nav className="hidden items-center gap-3 xl:flex">
+                {topNavItems.map((item) => {
+                  const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`rounded-full px-5 py-3 text-sm font-semibold transition ${
+                        active
+                          ? "bg-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]"
+                          : "text-slate-700 hover:bg-white/50 hover:text-slate-950"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-base font-bold text-white">{brand.productName}</p>
-              <p className="truncate text-xs text-slate-400">{brand.companyName}</p>
-            </div>
-          </div>
 
-          <nav className="flex-1 space-y-6 overflow-y-auto px-4 pb-6">
-            {navGroups.map((group) => (
-              <div key={group.label}>
-                <p className="px-3 text-xs font-medium text-slate-400">{group.label}</p>
-                <div className="mt-2 space-y-1">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const active =
-                      activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                          active
-                            ? "bg-slate-700/80 text-white shadow-inner"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        <Icon className="h-4 w-4" />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          <div className="border-t border-white/10 p-4">
-            <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                <ShieldCheck className="h-4 w-4 text-emerald-300" />
-                Secure workspace
-              </div>
-              <p className="mt-2 text-xs leading-5 text-slate-400">
-                Role-aware access, private merchant files, and production health checks are enabled.
-              </p>
-            </div>
-            {profile ? (
-              <div className="flex items-center gap-3 rounded-xl bg-black/15 p-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-900">
-                  {profile.full_name
-                    .split(" ")
-                    .map((part) => part[0])
-                    .join("")
-                    .slice(0, 2)}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{profile.full_name}</p>
-                  <p className="truncate text-xs text-slate-400">{profile.email}</p>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </aside>
-
-        <main className="flex min-w-0 flex-1 flex-col bg-white">
-          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500 text-sm font-bold text-white lg:hidden">
-                  {brand.initials}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">{eyebrow}</p>
-                  <h1 className="truncate text-xl font-bold text-slate-950 sm:text-2xl">{title}</h1>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <HeaderActions />
-                <div className="flex items-center gap-2">
-                  <Button variant="secondary" size="icon" type="button" aria-label="Notifications">
-                    <Bell className="h-4 w-4" />
-                  </Button>
-                  <Button variant="secondary" size="icon" type="button" aria-label="Support">
-                    <HelpCircle className="h-4 w-4" />
-                  </Button>
-                  {profile ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <HeaderActions />
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="icon" type="button" aria-label="Messages">
+                  <Mail className="h-4 w-4" />
+                </Button>
+                <Button variant="secondary" size="icon" type="button" aria-label="Notifications">
+                  <Bell className="h-4 w-4" />
+                </Button>
+                {profile ? (
+                  <div className="flex items-center gap-2 rounded-full bg-white/45 p-1.5 shadow-inner ring-1 ring-black/5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7eb31] text-sm font-black text-slate-950">
+                      {profile.full_name
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .slice(0, 2)}
+                    </div>
                     <form action={signOutAction}>
                       <Button variant="ghost" size="icon" type="submit" aria-label="Sign out">
                         <LogOut className="h-4 w-4" />
                       </Button>
                     </form>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
             </div>
-          </header>
+          </div>
 
-          <div className="flex-1 overflow-x-hidden bg-white px-4 py-6 sm:px-6 lg:px-8">{children}</div>
-        </main>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between xl:hidden">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">{eyebrow}</p>
+              <h1 className="text-2xl font-black text-slate-950">{title}</h1>
+            </div>
+            <nav className="flex gap-2 overflow-x-auto pb-1">
+              {topNavItems.map((item) => {
+                const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
+                      active ? "bg-black text-white" : "bg-white/45 text-slate-700"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </header>
+
+        <div className="relative">
+          <aside className="absolute left-5 top-12 z-20 hidden rounded-full bg-black/85 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:gap-2">
+            {railItems.map((item) => {
+              const Icon = item.icon;
+              const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
+              return (
+                <Link
+                  key={`${item.href}-${item.label}`}
+                  href={item.href}
+                  aria-label={item.label}
+                  title={item.label}
+                  className={`flex h-11 w-11 items-center justify-center rounded-full transition ${
+                    active ? "bg-[#f7eb31] text-black" : "text-white/90 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                </Link>
+              );
+            })}
+          </aside>
+
+          <main className="min-h-[calc(100vh-8rem)] px-4 py-6 sm:px-6 lg:px-8 xl:pl-28">
+            <div className="hidden pb-6 xl:block">
+              <p className="text-xs font-semibold uppercase text-slate-500">{eyebrow}</p>
+              <h1 className="mt-1 text-4xl font-black text-slate-950">{title}</h1>
+            </div>
+            {children}
+          </main>
+        </div>
+
+        <div className="hidden border-t border-white/35 bg-white/20 px-8 py-3 text-xs font-medium text-slate-500 xl:flex xl:items-center xl:justify-between">
+          <span className="inline-flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[#3157f6]" />
+            Production health and role-aware access enabled
+          </span>
+          <span>{brand.supportEmail}</span>
+        </div>
       </div>
     </div>
   );
