@@ -58,13 +58,15 @@ export function MerchantManager({
   data,
   currentProfile,
   currentAgentId,
+  initialSearchQuery = "",
 }: {
   data: CrmData;
   currentProfile: Profile;
   currentAgentId: string;
+  initialSearchQuery?: string;
 }) {
   const [merchants, setMerchants] = useState(data.merchants);
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [globalFilter, setGlobalFilter] = useState(initialSearchQuery);
   const [selectedId, setSelectedId] = useState(data.merchants[0]?.id ?? "");
   const [form, setForm] = useState<FormState>(blankForm);
   const [showControls, setShowControls] = useState(false);

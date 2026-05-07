@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarClock, FileUp, Mail, Phone, ReceiptText } from "luci
 import { createMerchantUpdateAction, uploadMerchantDocumentAction } from "@/lib/actions";
 import { getSessionContext } from "@/lib/auth";
 import { getMerchantDetailData } from "@/lib/data";
+import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,7 @@ export default async function MerchantProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { supabase } = await getSessionContext();
+  const { supabase, profile } = await getSessionContext();
   const detail = await getMerchantDetailData(supabase, id);
 
   if (!detail) notFound();
@@ -35,11 +36,11 @@ export default async function MerchantProfilePage({
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 text-slate-950 dark:bg-slate-950 dark:text-white sm:p-6">
+    <AppShell profile={profile} title={detail.merchant.business_name} eyebrow="Merchant profile" activeHref="/merchants">
       <div className="mx-auto max-w-6xl space-y-6">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-800">
+        <Link href="/merchants" className="inline-flex items-center gap-2 text-sm font-medium text-indigo-700 hover:text-indigo-800">
           <ArrowLeft className="h-4 w-4" />
-          Back to CRM
+          Back to merchants
         </Link>
 
         <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
@@ -174,7 +175,7 @@ export default async function MerchantProfilePage({
           </Card>
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }
 
