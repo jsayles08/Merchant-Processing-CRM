@@ -25,17 +25,26 @@ function defaultDueDate() {
   return new Date(Date.now() + 86_400_000).toISOString().slice(0, 16);
 }
 
-export function TaskManager({ data, currentProfile }: { data: CrmData; currentProfile: Profile }) {
+export function TaskManager({
+  data,
+  currentProfile,
+  initialMerchantId = "",
+}: {
+  data: CrmData;
+  currentProfile: Profile;
+  initialMerchantId?: string;
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const [tasks, setTasks] = useState(data.tasks);
   const assigneeOptions = data.profiles.filter((profile) => profile.status === "active");
+  const initialMerchant = data.merchants.some((merchant) => merchant.id === initialMerchantId) ? initialMerchantId : "";
   const [form, setForm] = useState<TaskForm>({
     title: "",
     description: "",
     assigned_to: currentProfile.id,
-    merchant_id: "",
+    merchant_id: initialMerchant,
     due_date: defaultDueDate(),
     priority: "medium",
   });
@@ -52,7 +61,7 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
         if (result.data) {
           setTasks((current) => [result.data as Task, ...current]);
         }
-        setForm((current) => ({ ...current, title: "", description: "", merchant_id: "", due_date: defaultDueDate() }));
+        setForm((current) => ({ ...current, title: "", description: "", merchant_id: initialMerchant, due_date: defaultDueDate() }));
         router.refresh();
       }
     });
@@ -81,14 +90,26 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
         </CardHeader>
         <CardContent className="space-y-4">
           <Field label="Title">
-            <Input value={form.title} onChange={(event) => update("title", event.target.value)} placeholder="Call merchant for statements" />
+            <Input
+              id="task-title"
+              name="title"
+              value={form.title}
+              onChange={(event) => update("title", event.target.value)}
+              placeholder="Call merchant for statements"
+            />
           </Field>
           <Field label="Description">
-            <Textarea value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="What needs to happen?" />
+            <Textarea
+              id="task-description"
+              name="description"
+              value={form.description}
+              onChange={(event) => update("description", event.target.value)}
+              placeholder="What needs to happen?"
+            />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <Field label="Assigned to">
-              <Select value={form.assigned_to} onChange={(event) => update("assigned_to", event.target.value)}>
+              <Select id="task-assigned-to" name="assigned_to" value={form.assigned_to} onChange={(event) => update("assigned_to", event.target.value)}>
                 {assigneeOptions.map((profile) => (
                   <option key={profile.id} value={profile.id}>
                     {profile.full_name}
@@ -97,7 +118,7 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
               </Select>
             </Field>
             <Field label="Merchant">
-              <Select value={form.merchant_id} onChange={(event) => update("merchant_id", event.target.value)}>
+              <Select id="task-merchant" name="merchant_id" value={form.merchant_id} onChange={(event) => update("merchant_id", event.target.value)}>
                 <option value="">No merchant</option>
                 {data.merchants.map((merchant) => (
                   <option key={merchant.id} value={merchant.id}>
@@ -107,10 +128,10 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
               </Select>
             </Field>
             <Field label="Due date">
-              <Input type="datetime-local" value={form.due_date} onChange={(event) => update("due_date", event.target.value)} />
+              <Input id="task-due-date" name="due_date" type="datetime-local" value={form.due_date} onChange={(event) => update("due_date", event.target.value)} />
             </Field>
             <Field label="Priority">
-              <Select value={form.priority} onChange={(event) => update("priority", event.target.value as Priority)}>
+              <Select id="task-priority" name="priority" value={form.priority} onChange={(event) => update("priority", event.target.value as Priority)}>
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
@@ -175,7 +196,7 @@ export function TaskManager({ data, currentProfile }: { data: CrmData; currentPr
 
           {completedTasks.length ? (
             <div className="pt-2">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Recently completed</p>
+              <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Recently completed</p>
               {completedTasks.map((task) => (
                 <div key={task.id} className="rounded-md border border-slate-100 p-3 text-sm text-slate-500 dark:border-slate-800">
                   {task.title} · {titleCase(task.status)}

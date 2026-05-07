@@ -7,7 +7,7 @@ export default async function DocumentsPage() {
 
   return (
     <AppShell profile={profile} title="Documents" eyebrow="Merchant files" activeHref="/documents">
-      <div className="mx-auto max-w-[1500px]">
+      <div className="w-full">
         <DocumentCenter data={data} />
       </div>
     </AppShell>

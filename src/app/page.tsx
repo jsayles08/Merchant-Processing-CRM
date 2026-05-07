@@ -7,7 +7,7 @@ export default async function Home() {
 
   return (
     <AppShell profile={profile} title="Customer Information" eyebrow="MerchantDesk CRM" activeHref="/">
-      <div className="mx-auto max-w-[1520px]">
+      <div className="w-full">
         <DashboardOverview data={data} />
       </div>
     </AppShell>

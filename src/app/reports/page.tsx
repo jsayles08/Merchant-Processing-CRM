@@ -7,7 +7,7 @@ export default async function ReportsPage() {
 
   return (
     <AppShell profile={profile} title="Reports" eyebrow="Business intelligence" activeHref="/reports">
-      <div className="mx-auto max-w-[1500px]">
+      <div className="w-full">
         <BusinessReports data={data} currentProfile={profile} />
       </div>
     </AppShell>

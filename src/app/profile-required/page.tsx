@@ -2,14 +2,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function ProfileRequiredPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
-      <Card className="w-full max-w-xl">
+    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] p-6">
+      <Card className="w-full max-w-xl bg-white/45">
         <CardHeader>
           <CardTitle>Profile Required</CardTitle>
-          <CardDescription>Your login is valid, but no CVEST role profile is attached yet.</CardDescription>
+          <CardDescription>Your login is valid, but no MerchantDesk role profile is attached yet.</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Ask a CVEST admin to create a `profiles` record for your Supabase Auth user. This keeps production
+        <CardContent className="text-sm leading-6 text-slate-600">
+          Ask a MerchantDesk admin to create a `profiles` record for your Supabase Auth user. This keeps production
           access controlled instead of allowing open self-signup.
         </CardContent>
       </Card>

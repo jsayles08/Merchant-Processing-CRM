@@ -97,7 +97,7 @@ async function buildOpenAIResponse(message: string, merchants: unknown[]) {
     text: {
       format: {
         type: "json_schema",
-        name: "cvest_copilot_response",
+        name: "merchantdesk_copilot_response",
         schema: {
           type: "object",
           additionalProperties: false,

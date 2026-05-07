@@ -22,10 +22,10 @@ async function LoginForm({ searchParams }: { searchParams: Promise<{ error?: str
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
-      <Card className="w-full max-w-md">
+    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] p-6">
+      <Card className="w-full max-w-md bg-white/45">
         <CardHeader>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-600 text-white">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f7eb31] text-slate-950 shadow-inner ring-1 ring-black/5">
             <Landmark className="h-6 w-6" />
           </div>
           <CardTitle>Sign in to {brand.companyName}</CardTitle>
@@ -42,25 +42,25 @@ async function LoginForm({ searchParams }: { searchParams: Promise<{ error?: str
               <Input id="password" name="password" type="password" autoComplete="current-password" required />
             </div>
             {params.error ? (
-              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
+              <p className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                 {params.error}
               </p>
             ) : null}
             {params.message ? (
-              <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+              <p className="rounded-2xl border border-[#4f9caf]/30 bg-white/55 p-3 text-sm text-slate-700">
                 {params.message}
               </p>
             ) : null}
-            <Button className="w-full" type="submit">
+            <Button className="w-full rounded-full" type="submit">
               Sign In
             </Button>
           </form>
-          <form action={requestPasswordResetAction} className="mt-6 space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <form action={requestPasswordResetAction} className="mt-6 space-y-3 border-t border-white/55 pt-4">
             <div className="space-y-1.5">
               <Label htmlFor="reset_email">Forgot password?</Label>
               <Input id="reset_email" name="email" type="email" autoComplete="email" placeholder="Enter your email" required />
             </div>
-            <Button className="w-full" type="submit" variant="secondary">
+            <Button className="w-full rounded-full" type="submit" variant="secondary">
               Send Password Reset Link
             </Button>
           </form>

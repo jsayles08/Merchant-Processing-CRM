@@ -266,6 +266,7 @@ export async function uploadMerchantDocumentAction(formData: FormData): Promise<
   });
 
   revalidatePath(`/merchants/${merchantId}`);
+  revalidatePath("/documents");
   return { ok: true, message: "Document uploaded." };
 }
 

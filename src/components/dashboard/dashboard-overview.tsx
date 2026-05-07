@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -65,7 +65,7 @@ const dealPalettes = [
 ];
 
 export function DashboardOverview({ data }: { data: CrmData }) {
-  const cards = useMemo<InteractionCard[]>(() => {
+  const allCards = useMemo<InteractionCard[]>(() => {
     const source = data.deals
       .flatMap((deal) => {
         const merchant = data.merchants.find((item) => item.id === deal.merchant_id);
@@ -81,16 +81,23 @@ export function DashboardOverview({ data }: { data: CrmData }) {
       })
       .sort((a, b) => b.value - a.value);
 
-    if (source.length) return source.slice(0, 6);
+    if (source.length) return source;
 
-    return data.merchants.slice(0, 6).map((merchant) => ({
+    return data.merchants.map((merchant) => ({
       deal: null,
       merchant,
       value: merchant.monthly_volume_estimate,
     }));
   }, [data.deals, data.merchants]);
 
-  const [selectedMerchantId, setSelectedMerchantId] = useState(cards[0]?.merchant.id ?? data.merchants[0]?.id ?? "");
+  const [selectedMerchantId, setSelectedMerchantId] = useState(allCards[0]?.merchant.id ?? data.merchants[0]?.id ?? "");
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [calendarOffset, setCalendarOffset] = useState(0);
+  const [scheduleExpanded, setScheduleExpanded] = useState(false);
+  const [funnelMode, setFunnelMode] = useState<"weighted" | "total">("weighted");
+  const [actionMessage, setActionMessage] = useState("");
+
+  const cards = showAllHistory ? allCards.slice(0, 12) : allCards.slice(0, 6);
   const selectedMerchant = data.merchants.find((merchant) => merchant.id === selectedMerchantId) ?? cards[0]?.merchant ?? data.merchants[0];
   const selectedDeal = selectedMerchant ? data.deals.find((deal) => deal.merchant_id === selectedMerchant.id) ?? null : null;
   const selectedAgent = selectedMerchant
@@ -102,6 +109,10 @@ export function DashboardOverview({ data }: { data: CrmData }) {
 
   const processingVolume = data.residuals.reduce((sum, residual) => sum + residual.processing_volume, 0);
   const pipelineValue = data.deals.reduce((sum, deal) => sum + deal.estimated_monthly_volume, 0);
+  const weightedPipelineValue = data.deals.reduce(
+    (sum, deal) => sum + deal.estimated_monthly_volume * (deal.close_probability / 100),
+    0,
+  );
   const activeTasks = data.tasks.filter((task) => task.status !== "completed").length;
   const recentMerchants = data.merchants.filter((merchant) => daysBetween(merchant.created_at) <= 7).length;
   const totalWonResidual = data.residuals.reduce((sum, residual) => sum + residual.net_residual, 0);
@@ -110,10 +121,48 @@ export function DashboardOverview({ data }: { data: CrmData }) {
     .map((stage) => {
       const stageDeals = data.deals.filter((deal) => deal.stage === stage.id);
       const total = stageDeals.reduce((sum, deal) => sum + deal.estimated_monthly_volume, 0);
-      return { ...stage, total, count: stageDeals.length };
+      const weighted = stageDeals.reduce((sum, deal) => sum + deal.estimated_monthly_volume * (deal.close_probability / 100), 0);
+      return { ...stage, total, weighted, deals: stageDeals, count: stageDeals.length };
     })
     .filter((stage) => stage.total > 0 || stage.count > 0);
-  const largestStage = Math.max(...stageRows.map((stage) => stage.total), 1);
+  const largestStage = Math.max(...stageRows.map((stage) => (funnelMode === "weighted" ? stage.weighted : stage.total)), 1);
+
+  const scheduleDate = new Date();
+  scheduleDate.setDate(1);
+  scheduleDate.setMonth(scheduleDate.getMonth() + calendarOffset);
+  const scheduleMonth = scheduleDate.toLocaleDateString("en-US", { month: "long" });
+  const scheduleDays = scheduleExpanded ? 35 : 21;
+
+  function selectMerchant(merchantId: string, message?: string) {
+    setSelectedMerchantId(merchantId);
+    if (message) setActionMessage(message);
+  }
+
+  function selectNextMerchant() {
+    if (!data.merchants.length || !selectedMerchant) return;
+    const index = data.merchants.findIndex((merchant) => merchant.id === selectedMerchant.id);
+    const nextMerchant = data.merchants[(index + 1) % data.merchants.length];
+    selectMerchant(nextMerchant.id, `Showing actions for ${nextMerchant.business_name}.`);
+  }
+
+  async function shareContact() {
+    if (!selectedMerchant) return;
+    const text = `${selectedMerchant.contact_name || selectedMerchant.business_name} | ${selectedMerchant.contact_email || "No email"} | ${
+      selectedMerchant.contact_phone || "No phone"
+    }`;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setActionMessage("Contact copied to clipboard.");
+        return;
+      }
+    } catch {
+      // Browser clipboard access can be blocked in previews; the visible status is the fallback.
+    }
+
+    setActionMessage(text);
+  }
 
   return (
     <section id="dashboard" className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -142,16 +191,28 @@ export function DashboardOverview({ data }: { data: CrmData }) {
           />
         </div>
 
+        {actionMessage ? (
+          <div className="rounded-[22px] border border-black/10 bg-white/45 px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_35px_rgba(15,23,42,0.06)] backdrop-blur">
+            {actionMessage}
+          </div>
+        ) : null}
+
         <Panel
           title="Interaction History"
           actions={
             <>
-              <IconButton label="More history">
+              <IconButton
+                label={showAllHistory ? "Show less history" : "More history"}
+                onClick={() => {
+                  setShowAllHistory((current) => !current);
+                  setActionMessage(showAllHistory ? "Showing the top six opportunities." : "Showing more opportunity history.");
+                }}
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </IconButton>
-              <IconButton label="Open opportunities">
+              <IconLink label="Open opportunities" href="/opportunities">
                 <ArrowUpRight className="h-4 w-4" />
-              </IconButton>
+              </IconLink>
             </>
           }
         >
@@ -162,7 +223,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
                 card={card}
                 palette={dealPalettes[index % dealPalettes.length]}
                 selected={selectedMerchant?.id === card.merchant.id}
-                onSelect={() => setSelectedMerchantId(card.merchant.id)}
+                onSelect={() => selectMerchant(card.merchant.id, `${card.merchant.business_name} selected.`)}
               />
             ))}
           </div>
@@ -173,29 +234,47 @@ export function DashboardOverview({ data }: { data: CrmData }) {
             title="Tasks Schedule"
             actions={
               <>
-                <IconButton label="Previous week">
+                <IconButton
+                  label="Previous month"
+                  onClick={() => {
+                    setCalendarOffset((current) => current - 1);
+                    setActionMessage("Schedule moved to the previous month.");
+                  }}
+                >
                   <ArrowLeft className="h-4 w-4" />
                 </IconButton>
-                <IconButton label="Next week">
+                <IconButton
+                  label="Next month"
+                  onClick={() => {
+                    setCalendarOffset((current) => current + 1);
+                    setActionMessage("Schedule moved to the next month.");
+                  }}
+                >
                   <ArrowRight className="h-4 w-4" />
                 </IconButton>
               </>
             }
           >
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-2xl font-semibold">October</p>
-              <IconButton label="Expand schedule">
+              <p className="text-2xl font-semibold">{scheduleMonth}</p>
+              <IconButton
+                label={scheduleExpanded ? "Collapse schedule" : "Expand schedule"}
+                onClick={() => {
+                  setScheduleExpanded((current) => !current);
+                  setActionMessage(scheduleExpanded ? "Schedule collapsed." : "Schedule expanded to a five-week view.");
+                }}
+              >
                 <Maximize2 className="h-4 w-4" />
               </IconButton>
             </div>
             <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 21 }, (_, item) => item + 1).map((day) => {
+              {Array.from({ length: scheduleDays }, (_, item) => item + 1).map((day) => {
                 const task = data.tasks[day % Math.max(data.tasks.length, 1)];
-                const active = [4, 11, 12, 16].includes(day);
+                const active = [4, 11, 12, 16, 23, 27].includes(day);
                 const color =
-                  day === 4
+                  day === 4 || day === 23
                     ? "bg-[#3157f6] text-white"
-                    : day === 11
+                    : day === 11 || day === 27
                       ? "bg-[#f7eb31] text-slate-950"
                       : day === 16
                         ? "bg-[#4f9caf] text-white"
@@ -204,12 +283,23 @@ export function DashboardOverview({ data }: { data: CrmData }) {
                           : "bg-white/32 text-slate-500";
 
                 return (
-                  <div key={day} className={`min-h-20 rounded-2xl p-2 text-xs ${color}`}>
+                  <button
+                    key={`${scheduleMonth}-${day}`}
+                    type="button"
+                    onClick={() =>
+                      setActionMessage(
+                        active
+                          ? `${task?.title ?? "Follow-up"} scheduled for ${scheduleMonth} ${day}.`
+                          : `No scheduled work on ${scheduleMonth} ${day}.`,
+                      )
+                    }
+                    className={`min-h-20 rounded-2xl p-2 text-left text-xs transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-black/20 ${color}`}
+                  >
                     <div className="flex items-center justify-between">
                       <span>{day}</span>
                       {active ? <AvatarStack names={[task?.title ?? "Task", selectedMerchant?.contact_name ?? "Merchant"]} /> : null}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -219,40 +309,78 @@ export function DashboardOverview({ data }: { data: CrmData }) {
             title="Stage Funnel"
             actions={
               <>
-                <IconButton label="Funnel menu">
+                <IconButton
+                  label="Funnel menu"
+                  onClick={() => {
+                    setFunnelMode((current) => (current === "weighted" ? "total" : "weighted"));
+                    setActionMessage("Funnel view switched.");
+                  }}
+                >
                   <MoreHorizontal className="h-4 w-4" />
                 </IconButton>
-                <IconButton label="Expand funnel">
+                <IconLink label="Expand funnel" href="/opportunities">
                   <ArrowUpRight className="h-4 w-4" />
-                </IconButton>
+                </IconLink>
               </>
             }
           >
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
-                <p className="text-3xl font-semibold">{currency(pipelineValue)}</p>
-                <p className="text-sm text-slate-500">Total in pipeline</p>
+                <p className="text-3xl font-semibold">{currency(funnelMode === "weighted" ? weightedPipelineValue : pipelineValue)}</p>
+                <p className="text-sm text-slate-500">{funnelMode === "weighted" ? "Weighted pipeline" : "Total in pipeline"}</p>
               </div>
               <div className="rounded-full bg-white/45 p-1 text-sm font-semibold">
-                <span className="inline-flex rounded-full bg-black px-4 py-2 text-white">Weighted</span>
-                <span className="inline-flex px-4 py-2 text-slate-500">Total</span>
+                <button
+                  type="button"
+                  onClick={() => setFunnelMode("weighted")}
+                  className={`inline-flex rounded-full px-4 py-2 transition ${
+                    funnelMode === "weighted" ? "bg-black text-white" : "text-slate-500 hover:text-slate-950"
+                  }`}
+                >
+                  Weighted
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFunnelMode("total")}
+                  className={`inline-flex rounded-full px-4 py-2 transition ${
+                    funnelMode === "total" ? "bg-black text-white" : "text-slate-500 hover:text-slate-950"
+                  }`}
+                >
+                  Total
+                </button>
               </div>
             </div>
             <div className="space-y-3">
-              {stageRows.slice(0, 5).map((stage) => (
-                <div key={stage.id} className="rounded-3xl bg-white/35 p-4">
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-600">{stage.label}</span>
-                    <span className="font-semibold">{currency(stage.total)}</span>
-                  </div>
-                  <div className="h-3 rounded-full bg-white/55">
-                    <div
-                      className="h-3 rounded-full bg-black"
-                      style={{ width: `${Math.max(10, Math.round((stage.total / largestStage) * 100))}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+              {stageRows.slice(0, 5).map((stage) => {
+                const value = funnelMode === "weighted" ? stage.weighted : stage.total;
+                const firstMerchant = data.merchants.find((merchant) => merchant.id === stage.deals[0]?.merchant_id);
+
+                return (
+                  <button
+                    key={stage.id}
+                    type="button"
+                    onClick={() => {
+                      if (firstMerchant) {
+                        selectMerchant(firstMerchant.id, `${stage.label} opened with ${firstMerchant.business_name}.`);
+                      } else {
+                        setActionMessage(`${stage.label} has no assigned merchant yet.`);
+                      }
+                    }}
+                    className="w-full rounded-3xl bg-white/35 p-4 text-left transition hover:bg-white/55 focus:outline-none focus:ring-2 focus:ring-black/20"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+                      <span className="font-medium text-slate-600">{stage.label}</span>
+                      <span className="font-semibold">{currency(value)}</span>
+                    </div>
+                    <div className="h-3 rounded-full bg-white/55">
+                      <div
+                        className="h-3 rounded-full bg-black"
+                        style={{ width: `${Math.max(10, Math.round((value / largestStage) * 100))}%` }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
               {!stageRows.length ? <p className="text-sm text-slate-500">No active pipeline stages yet.</p> : null}
             </div>
           </Panel>
@@ -260,22 +388,21 @@ export function DashboardOverview({ data }: { data: CrmData }) {
       </div>
 
       <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start">
-        <CustomerCard merchant={selectedMerchant} deal={selectedDeal} />
+        <CustomerCard
+          merchant={selectedMerchant}
+          deal={selectedDeal}
+          onShare={() => {
+            void shareContact();
+          }}
+          onSelectNext={selectNextMerchant}
+        />
         <DetailCard merchant={selectedMerchant} agentName={selectedProfile?.full_name ?? "Unassigned"} />
       </aside>
     </section>
   );
 }
 
-function Panel({
-  title,
-  actions,
-  children,
-}: {
-  title: string;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function Panel({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
   return (
     <div className="rounded-[34px] border border-white/55 bg-white/38 p-5 shadow-[0_20px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -329,7 +456,17 @@ function OpportunityTile({
   );
 }
 
-function CustomerCard({ merchant, deal }: { merchant?: Merchant; deal: Deal | null }) {
+function CustomerCard({
+  merchant,
+  deal,
+  onShare,
+  onSelectNext,
+}: {
+  merchant?: Merchant;
+  deal: Deal | null;
+  onShare: () => void;
+  onSelectNext: () => void;
+}) {
   if (!merchant) {
     return (
       <Panel title="Customer">
@@ -338,28 +475,26 @@ function CustomerCard({ merchant, deal }: { merchant?: Merchant; deal: Deal | nu
     );
   }
 
+  const taskHref = `/tasks?merchant=${encodeURIComponent(merchant.id)}`;
+
   return (
     <div className="rounded-[34px] border border-white/55 bg-white/38 p-6 text-center shadow-[0_20px_55px_rgba(15,23,42,0.08)] backdrop-blur-xl">
       <div className="mb-5 flex items-center justify-between">
         <div className="flex gap-2">
-          <IconButton label="Share contact">
+          <IconButton label="Share contact" onClick={onShare}>
             <Share2 className="h-4 w-4" />
           </IconButton>
-          <IconButton label="Filter actions">
+          <IconButton label="Next customer" onClick={onSelectNext}>
             <SlidersHorizontal className="h-4 w-4" />
           </IconButton>
         </div>
         <div className="flex gap-2">
-          <IconButton label="More actions">
+          <IconLink label="More actions" href={taskHref}>
             <MoreHorizontal className="h-4 w-4" />
-          </IconButton>
-          <Link
-            href={`/merchants/${merchant.id}`}
-            aria-label={`Open ${merchant.business_name}`}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/35 text-slate-950 transition hover:bg-white/65"
-          >
+          </IconLink>
+          <IconLink label={`Open ${merchant.business_name}`} href={`/merchants/${merchant.id}`}>
             <ArrowUpRight className="h-4 w-4" />
-          </Link>
+          </IconLink>
         </div>
       </div>
 
@@ -375,21 +510,21 @@ function CustomerCard({ merchant, deal }: { merchant?: Merchant; deal: Deal | nu
       </Badge>
 
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <IconButton label="Edit merchant">
+        <IconLink label="Edit merchant" href={`/merchants/${merchant.id}`}>
           <Edit3 className="h-4 w-4" />
-        </IconButton>
-        <IconButton label="Email merchant">
+        </IconLink>
+        <IconAnchor label="Email merchant" href={merchant.contact_email ? `mailto:${merchant.contact_email}` : `/merchants/${merchant.id}`}>
           <Mail className="h-4 w-4" />
-        </IconButton>
-        <IconButton label="Call merchant">
+        </IconAnchor>
+        <IconAnchor label="Call merchant" href={merchant.contact_phone ? `tel:${merchant.contact_phone}` : `/merchants/${merchant.id}`}>
           <Phone className="h-4 w-4" />
-        </IconButton>
-        <IconButton label="Add task">
+        </IconAnchor>
+        <IconLink label="Add task" href={taskHref}>
           <Plus className="h-4 w-4" />
-        </IconButton>
-        <IconButton label="Schedule follow up">
+        </IconLink>
+        <IconLink label="Schedule follow up" href={taskHref}>
           <CalendarDays className="h-4 w-4" />
-        </IconButton>
+        </IconLink>
       </div>
     </div>
   );
@@ -399,11 +534,11 @@ function DetailCard({ merchant, agentName }: { merchant?: Merchant; agentName: s
   if (!merchant) return null;
 
   const details = [
-    { icon: <UserRound className="h-4 w-4" />, label: "Business", value: merchant.business_name },
-    { icon: <Mail className="h-4 w-4" />, label: "Email", value: merchant.contact_email || "Missing" },
-    { icon: <Phone className="h-4 w-4" />, label: "Phone", value: merchant.contact_phone || "Missing" },
-    { icon: <UsersRound className="h-4 w-4" />, label: "Assigned agent", value: agentName },
-    { icon: <CalendarDays className="h-4 w-4" />, label: "Last contacted", value: new Date(merchant.updated_at).toLocaleString() },
+    { icon: <UserRound className="h-4 w-4" />, label: "Business", value: merchant.business_name, href: `/merchants/${merchant.id}` },
+    { icon: <Mail className="h-4 w-4" />, label: "Email", value: merchant.contact_email || "Missing", href: `/merchants/${merchant.id}` },
+    { icon: <Phone className="h-4 w-4" />, label: "Phone", value: merchant.contact_phone || "Missing", href: `/merchants/${merchant.id}` },
+    { icon: <UsersRound className="h-4 w-4" />, label: "Assigned agent", value: agentName, href: `/merchants/${merchant.id}` },
+    { icon: <CalendarDays className="h-4 w-4" />, label: "Last contacted", value: new Date(merchant.updated_at).toLocaleString(), href: `/tasks?merchant=${merchant.id}` },
   ];
 
   return (
@@ -411,16 +546,12 @@ function DetailCard({ merchant, agentName }: { merchant?: Merchant; agentName: s
       title="Detailed Information"
       actions={
         <>
-          <IconButton label="Edit details">
+          <IconLink label="Edit details" href={`/merchants/${merchant.id}`}>
             <Edit3 className="h-4 w-4" />
-          </IconButton>
-          <Link
-            href={`/merchants/${merchant.id}`}
-            aria-label={`Open ${merchant.business_name} details`}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/35 text-slate-950 transition hover:bg-white/65"
-          >
+          </IconLink>
+          <IconLink label={`Open ${merchant.business_name} details`} href={`/merchants/${merchant.id}`}>
             <ExternalLink className="h-4 w-4" />
-          </Link>
+          </IconLink>
         </>
       }
     >
@@ -432,9 +563,9 @@ function DetailCard({ merchant, agentName }: { merchant?: Merchant; agentName: s
               <p className="text-xs text-slate-500">{item.label}</p>
               <p className="truncate text-lg font-semibold text-slate-950">{item.value}</p>
             </div>
-            <IconButton label={`Update ${item.label}`}>
+            <IconLink label={`Update ${item.label}`} href={item.href}>
               <Plus className="h-4 w-4" />
-            </IconButton>
+            </IconLink>
           </div>
         ))}
       </div>
@@ -449,7 +580,7 @@ function StatPill({
   accent,
   accentClassName,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   value: string;
   label: string;
   accent: string;
@@ -469,16 +600,31 @@ function StatPill({
   );
 }
 
-function IconButton({ label, children }: { label: string; children: React.ReactNode }) {
+function controlClassName() {
+  return "flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/35 text-slate-950 transition hover:bg-white/65 focus:outline-none focus:ring-2 focus:ring-black/20";
+}
+
+function IconButton({ label, children, onClick }: { label: string; children: ReactNode; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/35 text-slate-950 transition hover:bg-white/65"
-    >
+    <button type="button" aria-label={label} title={label} onClick={onClick} className={controlClassName()}>
       {children}
     </button>
+  );
+}
+
+function IconLink({ label, children, href }: { label: string; children: ReactNode; href: string }) {
+  return (
+    <Link href={href} aria-label={label} title={label} className={controlClassName()}>
+      {children}
+    </Link>
+  );
+}
+
+function IconAnchor({ label, children, href }: { label: string; children: ReactNode; href: string }) {
+  return (
+    <a href={href} aria-label={label} title={label} className={controlClassName()}>
+      {children}
+    </a>
   );
 }
 

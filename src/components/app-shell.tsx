@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
 import { HeaderActions } from "@/components/header-actions";
-import { Button } from "@/components/ui/button";
 import { brand } from "@/lib/branding";
 import type { Profile } from "@/lib/types";
 
@@ -53,6 +52,9 @@ const railItems: NavItem[] = [
   { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
+const headerIconClassName =
+  "inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/45 text-slate-900 shadow-inner ring-1 ring-black/5 transition hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-black/20";
+
 export function AppShell({
   children,
   profile,
@@ -67,8 +69,8 @@ export function AppShell({
   activeHref?: string;
 }) {
   return (
-    <div className="min-h-screen bg-[#b6b7c0] p-3 text-slate-950 sm:p-5 lg:p-8">
-      <div className="mx-auto min-h-[calc(100vh-1.5rem)] max-w-[1840px] overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] shadow-[0_28px_90px_rgba(17,24,39,0.22)] sm:min-h-[calc(100vh-2.5rem)] lg:min-h-[calc(100vh-4rem)]">
+    <div className="min-h-screen bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] text-slate-950">
+      <div className="min-h-screen w-full overflow-hidden bg-[linear-gradient(120deg,rgba(220,238,255,0.98)_0%,rgba(237,248,229,0.98)_58%,rgba(255,246,223,0.98)_100%)]">
         <header className="sticky top-0 z-30 border-b border-white/35 bg-white/25 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-4">
@@ -107,12 +109,12 @@ export function AppShell({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <HeaderActions />
               <div className="flex items-center gap-2">
-                <Button variant="secondary" size="icon" type="button" aria-label="Messages">
+                <Link href="/copilot" aria-label="Messages" title="Messages" className={headerIconClassName}>
                   <Mail className="h-4 w-4" />
-                </Button>
-                <Button variant="secondary" size="icon" type="button" aria-label="Notifications">
+                </Link>
+                <Link href="/tasks" aria-label="Notifications" title="Notifications" className={headerIconClassName}>
                   <Bell className="h-4 w-4" />
-                </Button>
+                </Link>
                 {profile ? (
                   <div className="flex items-center gap-2 rounded-full bg-white/45 p-1.5 shadow-inner ring-1 ring-black/5">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f7eb31] text-sm font-black text-slate-950">
@@ -123,9 +125,9 @@ export function AppShell({
                         .slice(0, 2)}
                     </div>
                     <form action={signOutAction}>
-                      <Button variant="ghost" size="icon" type="submit" aria-label="Sign out">
+                      <button type="submit" aria-label="Sign out" title="Sign out" className={headerIconClassName}>
                         <LogOut className="h-4 w-4" />
-                      </Button>
+                      </button>
                     </form>
                   </div>
                 ) : null}

@@ -46,7 +46,7 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-left text-xs uppercase text-slate-500">
               <tr>
                 <th className="py-3">Agent</th>
                 <th className="py-3">Merchants</th>
@@ -133,7 +133,7 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
 function Summary({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="rounded-lg border border-slate-100 p-3 dark:border-slate-800">
-      <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+      <p className="flex items-center gap-2 text-xs font-medium uppercase text-slate-500">
         {icon}
         {label}
       </p>

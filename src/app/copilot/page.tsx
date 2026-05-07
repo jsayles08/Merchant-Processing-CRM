@@ -12,7 +12,7 @@ export default async function CopilotPage() {
 
   return (
     <AppShell profile={profile} title="Agent Copilot" eyebrow="AI assistant" activeHref="/copilot">
-      <div className="mx-auto max-w-[1100px]">
+      <div className="w-full">
         <CopilotPanel initialMessages={copilotMessages ?? []} merchants={data.merchants} />
       </div>
     </AppShell>

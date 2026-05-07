@@ -4,6 +4,7 @@ import { updatePasswordAction } from "@/app/reset-password/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
+import { brand } from "@/lib/branding";
 
 export default function ResetPasswordPage({
   searchParams,
@@ -21,14 +22,14 @@ async function ResetPasswordForm({ searchParams }: { searchParams: Promise<{ err
   const params = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
-      <Card className="w-full max-w-md">
+    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(120deg,#dceeff_0%,#edf8e5_58%,#fff6df_100%)] p-6">
+      <Card className="w-full max-w-md bg-white/45">
         <CardHeader>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-600 text-white">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f7eb31] text-slate-950 shadow-inner ring-1 ring-black/5">
             <KeyRound className="h-6 w-6" />
           </div>
           <CardTitle>Set a New Password</CardTitle>
-          <CardDescription>Choose a new password for your CVEST CRM account.</CardDescription>
+          <CardDescription>Choose a new password for your {brand.productName} account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={updatePasswordAction} className="space-y-4">
@@ -41,11 +42,11 @@ async function ResetPasswordForm({ searchParams }: { searchParams: Promise<{ err
               <Input id="confirm_password" name="confirm_password" type="password" autoComplete="new-password" required />
             </div>
             {params.error ? (
-              <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
+              <p className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                 {params.error}
               </p>
             ) : null}
-            <Button className="w-full" type="submit">
+            <Button className="w-full rounded-full" type="submit">
               Update Password
             </Button>
           </form>

@@ -12,7 +12,7 @@ export default async function MerchantsPage({
 
   return (
     <AppShell profile={profile} title="Merchants" eyebrow="Sales workspace" activeHref="/merchants">
-      <div className="mx-auto max-w-[1500px]">
+      <div className="w-full">
         <MerchantManager
           data={data}
           currentProfile={profile}

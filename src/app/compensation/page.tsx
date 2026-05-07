@@ -7,7 +7,7 @@ export default async function CompensationPage() {
 
   return (
     <AppShell profile={profile} title="Compensation" eyebrow="Residuals and overrides" activeHref="/compensation">
-      <div className="mx-auto max-w-[1500px]">
+      <div className="w-full">
         <CompensationOverview data={data} currentAgentId={currentAgentId} />
       </div>
     </AppShell>

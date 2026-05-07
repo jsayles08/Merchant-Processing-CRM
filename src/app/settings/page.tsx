@@ -7,7 +7,7 @@ export default async function SettingsPage() {
 
   return (
     <AppShell profile={profile} title="Settings" eyebrow="Admin workspace" activeHref="/settings">
-      <div className="mx-auto max-w-[1500px]">
+      <div className="w-full">
         <AdminSettings data={data} currentProfile={profile} />
       </div>
     </AppShell>
