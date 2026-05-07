@@ -40,9 +40,15 @@ export async function POST(request: Request) {
     .select("id,business_name,status,monthly_volume_estimate,proposed_rate,assigned_agent_id,updated_at")
     .limit(20);
 
-  const result = isOpenAIConfigured()
-    ? await buildOpenAIResponse(body.data.message, merchants ?? [])
-    : buildStructuredFallback(body.data.message);
+  let result: { content: string; actions: CopilotActionDraft[] };
+  try {
+    result = isOpenAIConfigured()
+      ? await buildOpenAIResponse(body.data.message, merchants ?? [])
+      : buildStructuredFallback(body.data.message, body.data.merchantId ?? null);
+  } catch (error) {
+    console.warn("Copilot OpenAI response failed; using structured fallback.", error);
+    result = buildStructuredFallback(body.data.message, body.data.merchantId ?? null);
+  }
 
   const { data: assistantMessage } = await supabase
     .from("copilot_messages")
@@ -64,9 +70,20 @@ export async function POST(request: Request) {
     payload: action.payload,
   }));
 
-  const { data: persistedActions } = actionRows.length
+  const { data: persistedActions, error: actionsError } = actionRows.length
     ? await supabase.from("copilot_actions").insert(actionRows).select("*")
-    : { data: [] };
+    : { data: [], error: null };
+
+  if (actionsError) {
+    return NextResponse.json(
+      {
+        id: assistantMessage?.id ?? crypto.randomUUID(),
+        content: `${result.content}\n\nI saved the message, but could not persist suggested actions: ${actionsError.message}`,
+        actions: [],
+      },
+      { status: 200 },
+    );
+  }
 
   return NextResponse.json({
     id: assistantMessage?.id ?? crypto.randomUUID(),
@@ -139,8 +156,9 @@ async function buildOpenAIResponse(message: string, merchants: unknown[]) {
   return parsed;
 }
 
-function buildStructuredFallback(message: string): { content: string; actions: CopilotActionDraft[] } {
+function buildStructuredFallback(message: string, merchantId?: string | null): { content: string; actions: CopilotActionDraft[] } {
   const lower = message.toLowerCase();
+  const merchantPayload = merchantId ? { merchant_id: merchantId } : {};
 
   if (lower.includes("follow") || lower.includes("tomorrow") || lower.includes("friday")) {
     return {
@@ -151,13 +169,13 @@ function buildStructuredFallback(message: string): { content: string; actions: C
           action_type: "create_task",
           action_summary: "Create a follow-up task from the requested timing.",
           requires_confirmation: true,
-          payload: { title: "Follow up with merchant", priority: "high" },
+          payload: { title: "Follow up with merchant", priority: "high", ...merchantPayload },
         },
         {
           action_type: "add_merchant_update",
           action_summary: "Add the call note to the merchant timeline.",
           requires_confirmation: true,
-          payload: { update_type: "call", note: message },
+          payload: { update_type: "call", note: message, ...merchantPayload },
         },
       ],
     };
@@ -172,7 +190,7 @@ function buildStructuredFallback(message: string): { content: string; actions: C
           action_type: "create_merchant",
           action_summary: "Create a new merchant lead and assign it to the current agent.",
           requires_confirmation: true,
-          payload: { source_text: message, status: "lead" },
+          payload: { source_text: message, status: "lead", business_name: extractFallbackMerchantName(message) },
         },
       ],
     };
@@ -187,7 +205,7 @@ function buildStructuredFallback(message: string): { content: string; actions: C
           action_type: "update_stage",
           action_summary: "Move the matched merchant to underwriting after confirmation.",
           requires_confirmation: true,
-          payload: { status: "underwriting", source_text: message },
+          payload: { status: "underwriting", source_text: message, ...merchantPayload },
         },
       ],
     };
@@ -220,4 +238,10 @@ function buildStructuredFallback(message: string): { content: string; actions: C
       },
     ],
   };
+}
+
+function extractFallbackMerchantName(message: string) {
+  const calledMatch = message.match(/called\s+([^.,]+?)(?:\s+contact|\s+wants|\.|,|$)/i);
+  const merchantMatch = message.match(/merchant\s+(?:called|named)?\s*([^.,]+?)(?:\s+contact|\s+wants|\.|,|$)/i);
+  return (calledMatch?.[1] || merchantMatch?.[1] || "New Merchant Lead").trim();
 }

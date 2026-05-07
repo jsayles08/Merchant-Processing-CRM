@@ -627,7 +627,21 @@ export async function createTaskAction(input: unknown): Promise<ActionResult> {
 
   if (error) return { ok: false, message: error.message };
 
+  await supabase.from("notifications").insert({
+    profile_id: data.assigned_to,
+    title: "Task assigned",
+    body: `${data.title} is due ${new Date(data.due_date).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })}.`,
+    url: data.merchant_id ? `/tasks?merchant=${data.merchant_id}` : "/tasks",
+    dedupe_key: `task-created:${data.id}`,
+  });
+
   revalidatePath("/");
+  revalidatePath("/notifications");
   return { ok: true, message: "Task created.", data };
 }
 
@@ -639,6 +653,34 @@ export async function updateTaskStatusAction(taskId: string, status: TaskStatus)
 
   revalidatePath("/");
   return { ok: true, message: "Task updated.", data };
+}
+
+export async function markNotificationReadAction(notificationId: string): Promise<ActionResult> {
+  const { supabase, profile } = await getSessionContext();
+  const { error } = await supabase
+    .from("notifications")
+    .update({ status: "read", read_at: new Date().toISOString() })
+    .eq("id", notificationId)
+    .eq("profile_id", profile.id);
+
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/notifications");
+  return { ok: true, message: "Notification marked read." };
+}
+
+export async function markAllNotificationsReadAction(): Promise<ActionResult> {
+  const { supabase, profile } = await getSessionContext();
+  const { error } = await supabase
+    .from("notifications")
+    .update({ status: "read", read_at: new Date().toISOString() })
+    .eq("profile_id", profile.id)
+    .eq("status", "unread");
+
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/notifications");
+  return { ok: true, message: "All notifications marked read." };
 }
 
 async function resolveTeamAssignment(

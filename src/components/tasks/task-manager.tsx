@@ -21,7 +21,14 @@ type TaskForm = {
   priority: Priority;
 };
 
-function defaultDueDate() {
+function defaultDueDate(initialDueDate = "") {
+  if (initialDueDate) {
+    const parsed = new Date(initialDueDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 16);
+    }
+  }
+
   return new Date(Date.now() + 86_400_000).toISOString().slice(0, 16);
 }
 
@@ -29,10 +36,12 @@ export function TaskManager({
   data,
   currentProfile,
   initialMerchantId = "",
+  initialDueDate = "",
 }: {
   data: CrmData;
   currentProfile: Profile;
   initialMerchantId?: string;
+  initialDueDate?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -45,7 +54,7 @@ export function TaskManager({
     description: "",
     assigned_to: currentProfile.id,
     merchant_id: initialMerchant,
-    due_date: defaultDueDate(),
+    due_date: defaultDueDate(initialDueDate),
     priority: "medium",
   });
 
@@ -61,7 +70,7 @@ export function TaskManager({
         if (result.data) {
           setTasks((current) => [result.data as Task, ...current]);
         }
-        setForm((current) => ({ ...current, title: "", description: "", merchant_id: initialMerchant, due_date: defaultDueDate() }));
+        setForm((current) => ({ ...current, title: "", description: "", merchant_id: initialMerchant, due_date: defaultDueDate(initialDueDate) }));
         router.refresh();
       }
     });

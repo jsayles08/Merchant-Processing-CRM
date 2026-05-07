@@ -27,13 +27,20 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { pipelineStages } from "@/lib/demo-data";
-import type { CrmData, Deal, Merchant } from "@/lib/types";
+import type { CrmData, Deal, Merchant, Task } from "@/lib/types";
 import { currency, daysBetween, titleCase } from "@/lib/utils";
 
 type InteractionCard = {
   deal: Deal | null;
   merchant: Merchant;
   value: number;
+};
+
+type MenuItem = {
+  label: string;
+  href?: string;
+  onSelect?: () => void;
+  disabled?: boolean;
 };
 
 const dealPalettes = [
@@ -99,6 +106,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [calendarOffset, setCalendarOffset] = useState(0);
   const [scheduleExpanded, setScheduleExpanded] = useState(false);
+  const [selectedScheduleDay, setSelectedScheduleDay] = useState(new Date().getDate());
   const [funnelMode, setFunnelMode] = useState<"weighted" | "total">("weighted");
   const [actionMessage, setActionMessage] = useState("");
 
@@ -138,8 +146,16 @@ export function DashboardOverview({ data }: { data: CrmData }) {
   const scheduleDate = new Date();
   scheduleDate.setDate(1);
   scheduleDate.setMonth(scheduleDate.getMonth() + calendarOffset);
+  const scheduleYear = scheduleDate.getFullYear();
+  const scheduleMonthIndex = scheduleDate.getMonth();
   const scheduleMonth = scheduleDate.toLocaleDateString("en-US", { month: "long" });
-  const scheduleDays = scheduleExpanded ? 35 : 21;
+  const daysInScheduleMonth = new Date(scheduleYear, scheduleMonthIndex + 1, 0).getDate();
+  const scheduleDays = scheduleExpanded ? daysInScheduleMonth : Math.min(daysInScheduleMonth, 21);
+  const selectedScheduleDate = formatLocalDate(scheduleYear, scheduleMonthIndex, Math.min(selectedScheduleDay, daysInScheduleMonth));
+  const selectedScheduleTasks = useMemo(
+    () => tasksForDay(data.tasks, scheduleYear, scheduleMonthIndex, Math.min(selectedScheduleDay, daysInScheduleMonth)),
+    [data.tasks, daysInScheduleMonth, scheduleMonthIndex, scheduleYear, selectedScheduleDay],
+  );
 
   function selectMerchant(merchantId: string, message?: string) {
     setSelectedMerchantId(merchantId);
@@ -155,21 +171,75 @@ export function DashboardOverview({ data }: { data: CrmData }) {
 
   async function shareContact() {
     if (!selectedMerchant) return;
-    const text = `${selectedMerchant.contact_name || selectedMerchant.business_name} | ${selectedMerchant.contact_email || "No email"} | ${
+    const contactUrl = `${window.location.origin}/merchants/${selectedMerchant.id}`;
+    const text = `${selectedMerchant.contact_name || selectedMerchant.business_name} | ${selectedMerchant.business_name} | ${
+      selectedMerchant.contact_email || "No email"
+    } | ${
       selectedMerchant.contact_phone || "No phone"
-    }`;
+    } | ${contactUrl}`;
 
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        setActionMessage("Contact copied to clipboard.");
+      if (navigator.share) {
+        await navigator.share({
+          title: selectedMerchant.business_name,
+          text,
+          url: contactUrl,
+        });
+        setActionMessage("Contact shared.");
         return;
       }
     } catch {
-      // Browser clipboard access can be blocked in previews; the visible status is the fallback.
+      // Native share can be cancelled or unavailable in preview browsers; clipboard is the fallback.
+    }
+
+    await copyText(text, "Contact copied with MerchantDesk profile link.");
+  }
+
+  async function copyText(text: string, successMessage: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setActionMessage(successMessage);
+        return;
+      }
+    } catch {
+      // Clipboard access can be blocked in previews; show the exact content so it is still usable.
     }
 
     setActionMessage(text);
+  }
+
+  function copyMerchantSummary(merchant: Merchant, deal: Deal | null) {
+    void copyText(
+      `${merchant.business_name} | ${merchant.contact_name || "No contact"} | ${merchant.contact_email || "No email"} | ${
+        merchant.contact_phone || "No phone"
+      } | ${titleCase(deal?.stage ?? merchant.status)} | ${currency(deal?.estimated_monthly_volume ?? merchant.monthly_volume_estimate)}`,
+      `${merchant.business_name} summary copied.`,
+    );
+  }
+
+  function copyPipelineSummary() {
+    void copyText(
+      stageRows
+        .map((stage) => `${stage.label}: ${stage.count} deals / ${currency(funnelMode === "weighted" ? stage.weighted : stage.total)}`)
+        .join("\n"),
+      "Pipeline summary copied.",
+    );
+  }
+
+  function selectScheduleDay(day: number, dayTasks: Task[]) {
+    setSelectedScheduleDay(day);
+    const firstMerchant = dayTasks[0]?.merchant_id
+      ? data.merchants.find((merchant) => merchant.id === dayTasks[0].merchant_id)
+      : null;
+    if (firstMerchant) {
+      setSelectedMerchantId(firstMerchant.id);
+    }
+    setActionMessage(
+      dayTasks.length
+        ? `${dayTasks.length} task${dayTasks.length === 1 ? "" : "s"} due on ${scheduleMonth} ${day}.`
+        : `No tasks due on ${scheduleMonth} ${day}. Use Add Task to schedule follow-up work.`,
+    );
   }
 
   return (
@@ -216,15 +286,23 @@ export function DashboardOverview({ data }: { data: CrmData }) {
           title="Interaction History"
           actions={
             <>
-              <IconButton
-                label={showAllHistory ? "Show less history" : "More history"}
-                onClick={() => {
-                  setShowAllHistory((current) => !current);
-                  setActionMessage(showAllHistory ? "Showing the top six opportunities." : "Showing more opportunity history.");
-                }}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </IconButton>
+              <MenuButton
+                label="Interaction history menu"
+                items={[
+                  {
+                    label: showAllHistory ? "Show top six" : "Show all history",
+                    onSelect: () => {
+                      setShowAllHistory((current) => !current);
+                      setActionMessage(showAllHistory ? "Showing the top six opportunities." : "Showing more opportunity history.");
+                    },
+                  },
+                  { label: "Open opportunities", href: "/opportunities" },
+                  ...(selectedMerchant
+                    ? [{ label: "Open selected merchant", href: `/merchants/${selectedMerchant.id}` }]
+                    : []),
+                  { label: "Copy pipeline summary", onSelect: copyPipelineSummary },
+                ]}
+              />
               <IconLink label="Open opportunities" href="/opportunities">
                 <ArrowUpRight className="h-4 w-4" />
               </IconLink>
@@ -239,6 +317,12 @@ export function DashboardOverview({ data }: { data: CrmData }) {
                 palette={dealPalettes[index % dealPalettes.length]}
                 selected={selectedMerchant?.id === card.merchant.id}
                 onSelect={() => selectMerchant(card.merchant.id, `${card.merchant.business_name} selected.`)}
+                menuItems={[
+                  { label: "Open profile", href: `/merchants/${card.merchant.id}` },
+                  { label: "Add follow-up task", href: `/tasks?merchant=${card.merchant.id}` },
+                  { label: "Message Copilot about this merchant", href: `/copilot?merchant=${card.merchant.id}` },
+                  { label: "Copy contact summary", onSelect: () => copyMerchantSummary(card.merchant, card.deal) },
+                ]}
               />
             ))}
           </div>
@@ -284,39 +368,92 @@ export function DashboardOverview({ data }: { data: CrmData }) {
             </div>
             <div className="grid grid-cols-7 gap-2">
               {Array.from({ length: scheduleDays }, (_, item) => item + 1).map((day) => {
-                const task = data.tasks[day % Math.max(data.tasks.length, 1)];
-                const active = [4, 11, 12, 16, 23, 27].includes(day);
+                const dayTasks = tasksForDay(data.tasks, scheduleYear, scheduleMonthIndex, day);
+                const primaryTask = dayTasks[0];
+                const active = dayTasks.length > 0;
+                const selected = day === Math.min(selectedScheduleDay, daysInScheduleMonth);
+                const hasHighPriority = dayTasks.some((task) => task.priority === "high");
+                const hasMediumPriority = dayTasks.some((task) => task.priority === "medium");
                 const color =
-                  day === 4 || day === 23
+                  selected
+                    ? "bg-black text-white"
+                    : hasHighPriority
+                      ? "bg-[#D57D25] text-white"
+                      : hasMediumPriority
+                        ? "bg-[#E9D7A1] text-[#0B0F15]"
+                        : active
                     ? "bg-[#0E5EC9] text-white"
-                    : day === 11 || day === 27
-                      ? "bg-[#E9D7A1] text-[#0B0F15]"
-                      : day === 16
-                        ? "bg-[#D57D25] text-white"
-                        : day === 12
-                          ? "bg-[#eadca0] text-slate-950"
-                          : "bg-white/32 text-slate-500";
+                    : "bg-white/32 text-slate-500";
 
                 return (
                   <button
                     key={`${scheduleMonth}-${day}`}
                     type="button"
-                    onClick={() =>
-                      setActionMessage(
-                        active
-                          ? `${task?.title ?? "Follow-up"} scheduled for ${scheduleMonth} ${day}.`
-                          : `No scheduled work on ${scheduleMonth} ${day}.`,
-                      )
-                    }
+                    aria-label={`${scheduleMonth} ${day}: ${dayTasks.length} task${dayTasks.length === 1 ? "" : "s"}`}
+                    onClick={() => selectScheduleDay(day, dayTasks)}
                     className={`min-h-20 rounded-2xl p-2 text-left text-xs transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-black/20 ${color}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{day}</span>
-                      {active ? <AvatarStack names={[task?.title ?? "Task", selectedMerchant?.contact_name ?? "Merchant"]} /> : null}
+                      {active ? <AvatarStack names={[primaryTask?.title ?? "Task", selectedMerchant?.contact_name ?? "Merchant"]} /> : null}
                     </div>
+                    {active ? <span className="mt-5 block text-[11px] font-bold">{dayTasks.length} due</span> : null}
                   </button>
                 );
               })}
+            </div>
+            <div className="mt-4 rounded-[24px] border border-[#ABB7C0]/25 bg-white/45 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase text-[#25425E]/65">
+                    {new Date(`${selectedScheduleDate}T09:00:00`).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <h3 className="text-lg font-black text-[#0B0F15]">
+                    {selectedScheduleTasks.length
+                      ? `${selectedScheduleTasks.length} scheduled task${selectedScheduleTasks.length === 1 ? "" : "s"}`
+                      : "No work scheduled"}
+                  </h3>
+                </div>
+                <Link
+                  href={`/tasks?${new URLSearchParams({
+                    ...(selectedMerchant ? { merchant: selectedMerchant.id } : {}),
+                    due: `${selectedScheduleDate}T09:00`,
+                  }).toString()}`}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#0B0F15] px-4 text-sm font-semibold text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Task
+                </Link>
+              </div>
+              <div className="mt-3 space-y-2">
+                {selectedScheduleTasks.map((task) => {
+                  const merchant = task.merchant_id ? data.merchants.find((item) => item.id === task.merchant_id) : null;
+                  return (
+                    <Link
+                      key={task.id}
+                      href={task.merchant_id ? `/tasks?merchant=${task.merchant_id}` : "/tasks"}
+                      className="block rounded-2xl border border-[#ABB7C0]/20 bg-white/55 p-3 text-sm transition hover:bg-white"
+                      onClick={() => {
+                        if (merchant) setSelectedMerchantId(merchant.id);
+                      }}
+                    >
+                      <span className="font-bold text-[#0B0F15]">{task.title}</span>
+                      <span className="mt-1 block text-[#25425E]/70">
+                        {merchant?.business_name ?? "No merchant"} · {new Date(task.due_date).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                      </span>
+                    </Link>
+                  );
+                })}
+                {!selectedScheduleTasks.length ? (
+                  <p className="text-sm leading-6 text-[#25425E]/70">
+                    Click Add Task to create a follow-up on this date. The task will be stored in Supabase and appear here when the dashboard reloads.
+                  </p>
+                ) : null}
+              </div>
             </div>
           </Panel>
 
@@ -324,15 +461,27 @@ export function DashboardOverview({ data }: { data: CrmData }) {
             title="Stage Funnel"
             actions={
               <>
-                <IconButton
+                <MenuButton
                   label="Funnel menu"
-                  onClick={() => {
-                    setFunnelMode((current) => (current === "weighted" ? "total" : "weighted"));
-                    setActionMessage("Funnel view switched.");
-                  }}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </IconButton>
+                  items={[
+                    {
+                      label: "Show weighted pipeline",
+                      onSelect: () => {
+                        setFunnelMode("weighted");
+                        setActionMessage("Showing weighted pipeline.");
+                      },
+                    },
+                    {
+                      label: "Show total pipeline",
+                      onSelect: () => {
+                        setFunnelMode("total");
+                        setActionMessage("Showing total pipeline.");
+                      },
+                    },
+                    { label: "Open opportunities", href: "/opportunities" },
+                    { label: "Copy funnel summary", onSelect: copyPipelineSummary },
+                  ]}
+                />
                 <IconLink label="Expand funnel" href="/opportunities">
                   <ArrowUpRight className="h-4 w-4" />
                 </IconLink>
@@ -506,40 +655,48 @@ function OpportunityTile({
   palette,
   selected,
   onSelect,
+  menuItems,
 }: {
   card: InteractionCard;
   palette: (typeof dealPalettes)[number];
   selected: boolean;
   onSelect: () => void;
+  menuItems: MenuItem[];
 }) {
   const date = card.deal?.expected_close_date
     ? new Date(card.deal.expected_close_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : new Date(card.merchant.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onSelect}
-      className={`min-h-44 rounded-[24px] p-5 text-left transition hover:-translate-y-1 hover:shadow-2xl focus:outline-none focus:ring-2 focus:ring-black/30 ${palette.card} ${
+    <div
+      className={`min-h-44 rounded-[24px] p-5 text-left transition hover:-translate-y-1 hover:shadow-2xl ${palette.card} ${
         selected ? "ring-2 ring-black/20" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <button
+          type="button"
+          aria-pressed={selected}
+          aria-label={`Select ${card.merchant.business_name}`}
+          onClick={onSelect}
+          className="min-w-0 flex-1 text-left focus:outline-none focus:ring-2 focus:ring-black/30"
+        >
           <p className={`text-sm font-medium ${palette.muted}`}>{date}</p>
           <h3 className="mt-3 max-w-[14rem] text-base font-semibold leading-5">{card.merchant.business_name}</h3>
           <p className={`mt-1 text-sm ${palette.muted}`}>{titleCase(card.deal?.stage ?? card.merchant.status)}</p>
-        </div>
-        <span className={`flex h-10 w-10 items-center justify-center rounded-full ${palette.chip}`}>
-          <MoreHorizontal className="h-4 w-4" />
-        </span>
+        </button>
+        <MenuButton label={`${card.merchant.business_name} actions`} items={menuItems} buttonClassName={palette.chip} />
       </div>
-      <div className="mt-7 flex items-end justify-between gap-3">
+      <button
+        type="button"
+        aria-label={`Select ${card.merchant.business_name} value`}
+        onClick={onSelect}
+        className="mt-7 flex w-full items-end justify-between gap-3 text-left focus:outline-none focus:ring-2 focus:ring-black/30"
+      >
         <p className="text-2xl font-bold">{currency(card.value)}</p>
         <AvatarStack names={[card.merchant.contact_name, card.merchant.business_name, card.merchant.industry]} />
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -576,9 +733,16 @@ function CustomerCard({
           </IconButton>
         </div>
         <div className="flex gap-2">
-          <IconLink label="More actions" href={taskHref}>
-            <MoreHorizontal className="h-4 w-4" />
-          </IconLink>
+          <MenuButton
+            label="More customer actions"
+            items={[
+              { label: "Open merchant profile", href: `/merchants/${merchant.id}` },
+              { label: "Add follow-up task", href: taskHref },
+              { label: "Open documents", href: "/documents" },
+              { label: "Ask Copilot", href: `/copilot?merchant=${merchant.id}` },
+              { label: "Copy share contact", onSelect: onShare },
+            ]}
+          />
           <IconLink label={`Open ${merchant.business_name}`} href={`/merchants/${merchant.id}`}>
             <ArrowUpRight className="h-4 w-4" />
           </IconLink>
@@ -699,6 +863,62 @@ function IconButton({ label, children, onClick }: { label: string; children: Rea
   );
 }
 
+function MenuButton({
+  label,
+  items,
+  buttonClassName = "",
+}: {
+  label: string;
+  items: MenuItem[];
+  buttonClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        aria-expanded={open}
+        className={`${controlClassName()} ${buttonClassName}`}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open ? (
+        <div className="absolute right-0 top-12 z-40 w-60 overflow-hidden rounded-[22px] border border-[#ABB7C0]/25 bg-[#FDFDFD] p-2 text-left shadow-[0_24px_60px_rgba(11,15,21,0.16)]">
+          {items.map((item) =>
+            item.href ? (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="block rounded-2xl px-3 py-2 text-sm font-semibold text-[#25425E] transition hover:bg-[#E9D7A1]/35 hover:text-[#0B0F15]"
+                onClick={() => setOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ) : (
+              <button
+                key={item.label}
+                type="button"
+                disabled={item.disabled}
+                className="block w-full rounded-2xl px-3 py-2 text-left text-sm font-semibold text-[#25425E] transition hover:bg-[#E9D7A1]/35 hover:text-[#0B0F15] disabled:opacity-45"
+                onClick={() => {
+                  setOpen(false);
+                  item.onSelect?.();
+                }}
+              >
+                {item.label}
+              </button>
+            ),
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function IconLink({ label, children, href }: { label: string; children: ReactNode; href: string }) {
   return (
     <Link href={href} aria-label={label} title={label} className={controlClassName()}>
@@ -738,4 +958,19 @@ function initials(value: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function tasksForDay(tasks: Task[], year: number, monthIndex: number, day: number) {
+  return tasks
+    .filter((task) => {
+      const due = new Date(task.due_date);
+      return due.getFullYear() === year && due.getMonth() === monthIndex && due.getDate() === day && task.status !== "completed";
+    })
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+}
+
+function formatLocalDate(year: number, monthIndex: number, day: number) {
+  const month = `${monthIndex + 1}`.padStart(2, "0");
+  const date = `${day}`.padStart(2, "0");
+  return `${year}-${month}-${date}`;
 }

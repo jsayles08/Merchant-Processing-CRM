@@ -25,12 +25,16 @@ const examples = [
 export function CopilotPanel({
   initialMessages,
   merchants,
+  initialMerchantId = "",
 }: {
   initialMessages: CopilotMessage[];
   merchants: Merchant[];
+  initialMerchantId?: string;
 }) {
   const [input, setInput] = useState("I spoke to Mike at Joe's Pizza. He wants a follow-up Friday and currently processes about $45k/month.");
-  const [selectedMerchantId, setSelectedMerchantId] = useState("");
+  const [selectedMerchantId, setSelectedMerchantId] = useState(
+    merchants.some((merchant) => merchant.id === initialMerchantId) ? initialMerchantId : "",
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>(
     initialMessages.length
@@ -66,25 +70,31 @@ export function CopilotPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMessage.content, merchantId: selectedMerchantId || null }),
       });
-      const payload = (await response.json()) as { id?: string; content: string; actions?: CopilotAction[] };
+      const payload = (await response.json()) as { id?: string; content?: string; actions?: CopilotAction[]; message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Copilot request failed.");
+      }
 
       setMessages((current) => [
         ...current,
         {
           id: payload.id ?? crypto.randomUUID(),
           role: "assistant",
-          content: payload.content,
+          content: payload.content ?? "I processed the request, but no response content was returned.",
           actions: payload.actions,
         },
       ]);
-    } catch {
+    } catch (error) {
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
           content:
-            "I could not reach the Copilot route. Suggested fallback: create a follow-up task, append the note to the merchant timeline, and ask for statement volume before pricing.",
+            error instanceof Error
+              ? `Copilot could not finish that request: ${error.message}`
+              : "I could not reach the Copilot route. Suggested fallback: create a follow-up task, append the note to the merchant timeline, and ask for statement volume before pricing.",
           actions: [],
         },
       ]);
@@ -97,6 +107,10 @@ export function CopilotPanel({
     const response = await fetch(`/api/copilot/actions/${actionId}/confirm`, { method: "POST" });
     const payload = (await response.json()) as { ok: boolean; message: string; status?: CopilotAction["status"] };
     setStatusMessage(payload.message);
+
+    if (!response.ok) {
+      return;
+    }
 
     if (payload.ok) {
       setMessages((current) =>

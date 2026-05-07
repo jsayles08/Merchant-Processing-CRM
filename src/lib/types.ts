@@ -202,6 +202,18 @@ export type CopilotMessage = {
   created_at: string;
 };
 
+export type Notification = {
+  id: string;
+  profile_id: string;
+  title: string;
+  body: string;
+  url: string | null;
+  dedupe_key: string | null;
+  status: "unread" | "read" | string;
+  read_at: string | null;
+  created_at: string;
+};
+
 export type AuditLog = {
   id: string;
   actor_profile_id: string | null;

@@ -109,10 +109,10 @@ export function AppShell({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <HeaderActions />
               <div className="flex items-center gap-2">
-                <Link href="/copilot" aria-label="Messages" title="Messages" className={headerIconClassName}>
+                <Link href="/messages" aria-label="Messages" title="Messages" className={headerIconClassName}>
                   <Mail className="h-4 w-4" />
                 </Link>
-                <Link href="/tasks" aria-label="Notifications" title="Notifications" className={headerIconClassName}>
+                <Link href="/notifications" aria-label="Notifications" title="Notifications" className={headerIconClassName}>
                   <Bell className="h-4 w-4" />
                 </Link>
                 {profile ? (

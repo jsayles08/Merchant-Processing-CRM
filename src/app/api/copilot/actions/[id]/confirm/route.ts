@@ -1,7 +1,21 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
 import type { CopilotAction, MerchantStatus } from "@/lib/types";
+
+const merchantStatuses: MerchantStatus[] = [
+  "lead",
+  "contacted",
+  "qualified",
+  "application_sent",
+  "underwriting",
+  "approved",
+  "onboarded",
+  "processing",
+  "inactive",
+  "lost",
+];
 
 export async function POST(
   _request: Request,
@@ -26,11 +40,80 @@ export async function POST(
   }
 
   const payload = action.payload ?? {};
-  const merchantId = action.merchant_id ?? (typeof payload.merchant_id === "string" ? payload.merchant_id : null);
+  let merchantId = action.merchant_id ?? (typeof payload.merchant_id === "string" ? payload.merchant_id : null);
   let completionMessage = "Action confirmed.";
   let completed = false;
 
-  if (action.action_type === "update_stage" && merchantId && typeof payload.status === "string") {
+  if (action.action_type === "create_merchant") {
+    const { data: currentAgent } = await supabase
+      .from("agents")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .maybeSingle<{ id: string }>();
+    let assignedAgentId = currentAgent?.id ?? null;
+    if (!assignedAgentId) {
+      const { data: fallbackAgent } = await supabase
+        .from("agents")
+        .select("id")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle<{ id: string }>();
+      assignedAgentId = fallbackAgent?.id ?? null;
+    }
+
+    if (!assignedAgentId) {
+      return NextResponse.json({ ok: false, message: "Create an agent record before Copilot can create merchants." }, { status: 403 });
+    }
+
+    const businessName =
+      typeof payload.business_name === "string" && payload.business_name.trim()
+        ? payload.business_name.trim()
+        : typeof payload.source_text === "string"
+          ? extractBusinessName(payload.source_text)
+          : "New Merchant Lead";
+    const status = typeof payload.status === "string" && isMerchantStatus(payload.status) ? payload.status : "lead";
+    const proposedRate = typeof payload.proposed_rate === "number" ? payload.proposed_rate : 1.65;
+    const monthlyVolume = typeof payload.monthly_volume_estimate === "number" ? payload.monthly_volume_estimate : 0;
+
+    const { data: merchant, error: merchantError } = await supabase
+      .from("merchants")
+      .insert({
+        business_name: businessName,
+        contact_name: typeof payload.contact_name === "string" ? payload.contact_name : "Primary Contact",
+        contact_email: typeof payload.contact_email === "string" ? payload.contact_email : null,
+        contact_phone: typeof payload.contact_phone === "string" ? payload.contact_phone : null,
+        business_address: "",
+        industry: typeof payload.industry === "string" ? payload.industry : "Uncategorized",
+        monthly_volume_estimate: monthlyVolume,
+        average_ticket: typeof payload.average_ticket === "number" ? payload.average_ticket : 0,
+        current_processor: typeof payload.current_processor === "string" ? payload.current_processor : null,
+        proposed_rate: proposedRate,
+        status,
+        assigned_agent_id: assignedAgentId,
+        notes: typeof payload.source_text === "string" ? payload.source_text : action.action_summary,
+      })
+      .select("id")
+      .single<{ id: string }>();
+
+    if (merchantError || !merchant) throw merchantError ?? new Error("Merchant was not created.");
+
+    const { error: dealError } = await supabase.from("deals").insert({
+      merchant_id: merchant.id,
+      agent_id: assignedAgentId,
+      stage: status,
+      proposed_rate: proposedRate,
+      estimated_monthly_volume: monthlyVolume,
+      estimated_residual: Math.round(monthlyVolume * (proposedRate / 100) * 0.28),
+      close_probability: status === "processing" ? 100 : 25,
+    });
+    if (dealError) throw dealError;
+
+    merchantId = merchant.id;
+    completionMessage = "Merchant lead created.";
+    completed = true;
+  }
+
+  if (action.action_type === "update_stage" && merchantId && typeof payload.status === "string" && isMerchantStatus(payload.status)) {
     const status = payload.status as MerchantStatus;
     const merchantUpdate = await supabase.from("merchants").update({ status }).eq("id", merchantId);
     if (merchantUpdate.error) throw merchantUpdate.error;
@@ -47,7 +130,17 @@ export async function POST(
       .eq("profile_id", profile.id)
       .maybeSingle<{ id: string }>();
 
-    if (!currentAgent?.id) {
+    let actionAgentId = currentAgent?.id ?? null;
+    if (!actionAgentId && merchantId) {
+      const { data: merchant } = await supabase
+        .from("merchants")
+        .select("assigned_agent_id")
+        .eq("id", merchantId)
+        .maybeSingle<{ assigned_agent_id: string }>();
+      actionAgentId = merchant?.assigned_agent_id ?? null;
+    }
+
+    if (!actionAgentId) {
       return NextResponse.json({ ok: false, message: "No agent record is attached to your profile." }, { status: 403 });
     }
 
@@ -56,7 +149,7 @@ export async function POST(
 
     const update = await supabase.from("merchant_updates").insert({
       merchant_id: merchantId,
-      agent_id: currentAgent.id,
+      agent_id: actionAgentId,
       update_type: updateType,
       note,
     });
@@ -73,7 +166,7 @@ export async function POST(
       assigned_to: profile.id,
       merchant_id: merchantId,
       due_date: new Date(Date.now() + 86_400_000).toISOString(),
-      priority: typeof payload.priority === "string" ? payload.priority : "medium",
+      priority: isPriority(payload.priority) ? payload.priority : "medium",
       status: "open",
     });
 
@@ -85,6 +178,7 @@ export async function POST(
   const { error: updateError } = await supabase
     .from("copilot_actions")
     .update({
+      merchant_id: merchantId ?? action.merchant_id,
       status: completed ? "completed" : "confirmed",
       confirmed_at: new Date().toISOString(),
     })
@@ -104,5 +198,25 @@ export async function POST(
     },
   });
 
+  revalidatePath("/");
+  revalidatePath("/copilot");
+  revalidatePath("/messages");
+  revalidatePath("/merchants");
+  if (merchantId) revalidatePath(`/merchants/${merchantId}`);
+
   return NextResponse.json({ ok: true, message: completionMessage, status: completed ? "completed" : "confirmed" });
+}
+
+function isMerchantStatus(value: string): value is MerchantStatus {
+  return merchantStatuses.includes(value as MerchantStatus);
+}
+
+function isPriority(value: unknown): value is "low" | "medium" | "high" {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+function extractBusinessName(sourceText: string) {
+  const calledMatch = sourceText.match(/called\s+([^.,]+?)(?:\s+contact|\s+wants|\.|,|$)/i);
+  const merchantMatch = sourceText.match(/merchant\s+(?:called|named)?\s*([^.,]+?)(?:\s+contact|\s+wants|\.|,|$)/i);
+  return (calledMatch?.[1] || merchantMatch?.[1] || "New Merchant Lead").trim();
 }
