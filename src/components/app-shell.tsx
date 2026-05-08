@@ -162,7 +162,7 @@ export function AppShell({
         </header>
 
         <div className="relative">
-          <aside className="absolute left-5 top-12 z-20 hidden rounded-full bg-[#0B0F15] p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:gap-2">
+          <aside className="fixed left-5 top-[8.5rem] z-20 hidden max-h-[calc(100vh-10rem)] overflow-visible rounded-full bg-[#0B0F15]/95 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:items-start xl:gap-2">
             {railItems.map((item) => {
               const Icon = item.icon;
               const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
@@ -172,11 +172,18 @@ export function AppShell({
                   href={item.href}
                   aria-label={item.label}
                   title={item.label}
-                  className={`flex h-11 w-11 items-center justify-center rounded-full transition ${
-                    active ? "bg-[#E9D7A1] text-[#0B0F15]" : "text-white/90 hover:bg-white/10 hover:text-white"
+                  className={`group/rail-link flex h-11 w-11 min-w-[2.75rem] items-center overflow-hidden whitespace-nowrap rounded-full transition-all duration-200 ease-out hover:w-48 hover:pr-4 focus-visible:w-48 focus-visible:pr-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D7A1]/75 ${
+                    active
+                      ? "bg-[#E9D7A1] text-[#0B0F15]"
+                      : "text-white/90 hover:bg-white hover:text-[#0B0F15] focus-visible:bg-white focus-visible:text-[#0B0F15]"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="max-w-0 overflow-hidden text-sm font-semibold opacity-0 transition-all duration-200 ease-out group-hover/rail-link:ml-1 group-hover/rail-link:max-w-[9rem] group-hover/rail-link:opacity-100 group-focus-visible/rail-link:ml-1 group-focus-visible/rail-link:max-w-[9rem] group-focus-visible/rail-link:opacity-100">
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
