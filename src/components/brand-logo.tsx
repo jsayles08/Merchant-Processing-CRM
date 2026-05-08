@@ -14,8 +14,8 @@ export function BrandLogo({
     <Image
       src={mark ? "/merchantdesk-mark.png" : "/merchantdesk-logo.png"}
       alt={`${brand.productName} logo`}
-      width={mark ? 640 : 1101}
-      height={mark ? 640 : 499}
+      width={mark ? 640 : 802}
+      height={mark ? 640 : 444}
       priority={priority}
       className={className}
     />
