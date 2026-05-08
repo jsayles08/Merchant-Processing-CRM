@@ -7,7 +7,7 @@ import { getSessionContext } from "@/lib/auth";
 import { brand } from "@/lib/branding";
 import { normalizeImportMonth, parseProcessorResidualCsv } from "@/lib/residual-import";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { MerchantStatus, Task, TaskStatus } from "@/lib/types";
+import type { Document, Merchant, MerchantStatus, Task, TaskStatus } from "@/lib/types";
 
 export type ActionResult = {
   ok: boolean;
@@ -163,6 +163,98 @@ export async function updateMerchantStatusAction(merchantId: string, status: Mer
   revalidatePath("/");
   revalidatePath(`/merchants/${merchantId}`);
   return { ok: true, message: "Merchant stage updated." };
+}
+
+export async function deleteMerchantAction(merchantId: string): Promise<ActionResult> {
+  if (!merchantId) {
+    return { ok: false, message: "Choose a merchant to delete." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+
+  if (profile.role === "agent") {
+    return { ok: false, message: "Only managers and admins can delete merchants." };
+  }
+
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .select("*")
+    .eq("id", merchantId)
+    .maybeSingle<Merchant>();
+
+  if (merchantError) {
+    return { ok: false, message: merchantError.message };
+  }
+
+  if (!merchant) {
+    return { ok: false, message: "Merchant was not found or is outside your book." };
+  }
+
+  const adminSupabase = createAdminClient();
+  const { data: documents, error: documentsError } = await adminSupabase
+    .from("documents")
+    .select("*")
+    .eq("merchant_id", merchantId)
+    .returns<Document[]>();
+
+  if (documentsError) {
+    return { ok: false, message: documentsError.message };
+  }
+
+  const storagePaths = (documents ?? [])
+    .map((document) => document.file_url)
+    .filter((fileUrl) => fileUrl && !fileUrl.startsWith("http") && !fileUrl.startsWith("/"));
+
+  if (storagePaths.length) {
+    const { error: storageError } = await adminSupabase.storage.from("merchant-documents").remove(storagePaths);
+    if (storageError) {
+      return { ok: false, message: `Merchant files could not be removed: ${storageError.message}` };
+    }
+  }
+
+  const { count: updateCount } = await adminSupabase
+    .from("merchant_updates")
+    .select("id", { count: "exact", head: true })
+    .eq("merchant_id", merchantId);
+  const { count: taskCount } = await adminSupabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("merchant_id", merchantId);
+  const { count: residualCount } = await adminSupabase
+    .from("residuals")
+    .select("id", { count: "exact", head: true })
+    .eq("merchant_id", merchantId);
+
+  const { error: deleteError } = await adminSupabase.from("merchants").delete().eq("id", merchantId);
+
+  if (deleteError) {
+    return { ok: false, message: deleteError.message };
+  }
+
+  await writeAuditLog(supabase, profile, {
+    action: "merchant.delete",
+    entityType: "merchant",
+    entityId: merchantId,
+    summary: `${profile.full_name} deleted merchant ${merchant.business_name}.`,
+    metadata: {
+      business_name: merchant.business_name,
+      assigned_agent_id: merchant.assigned_agent_id,
+      documents_removed: storagePaths.length,
+      document_records_removed: documents?.length ?? 0,
+      updates_removed: updateCount ?? 0,
+      tasks_removed: taskCount ?? 0,
+      residuals_removed: residualCount ?? 0,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/merchants");
+  revalidatePath(`/merchants/${merchantId}`);
+  revalidatePath("/documents");
+  revalidatePath("/opportunities");
+  revalidatePath("/reports");
+  revalidatePath("/tasks");
+  return { ok: true, message: `${merchant.business_name} was deleted.` };
 }
 
 export async function createMerchantUpdateAction(formData: FormData): Promise<ActionResult> {

@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/incompatible-library -- TanStack Table intentionally returns function accessors that React Compiler skips. */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   type ColumnDef,
   flexRender,
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
+import { DeleteMerchantButton } from "@/components/merchants/delete-merchant-button";
 import { createMerchantAction, updateMerchantStatusAction } from "@/lib/actions";
 import { requiresManagementApproval } from "@/lib/compensation";
 import { pipelineStages } from "@/lib/demo-data";
@@ -102,6 +103,18 @@ export function MerchantManager({
     [agentFilter, merchants, stageFilter],
   );
   const hasActiveControls = Boolean(globalFilter || stageFilter !== "all" || agentFilter !== "all");
+  const canDeleteMerchants = currentProfile.role !== "agent";
+
+  const handleMerchantDeleted = useCallback(
+    (merchantId: string, resultMessage: string) => {
+      setMerchants((current) => current.filter((merchant) => merchant.id !== merchantId));
+      setSelectedId((currentSelectedId) =>
+        currentSelectedId === merchantId ? merchants.find((merchant) => merchant.id !== merchantId)?.id ?? "" : currentSelectedId,
+      );
+      setMessage(resultMessage);
+    },
+    [merchants],
+  );
 
   const columns = useMemo<ColumnDef<Merchant>[]>(
     () => [
@@ -120,6 +133,17 @@ export function MerchantManager({
             <Link className="text-xs font-semibold text-[#0E5EC9] hover:text-[#D57D25]" href={`/merchants/${row.original.id}`}>
               Open profile
             </Link>
+            {canDeleteMerchants ? (
+              <div className="pt-1">
+                <DeleteMerchantButton
+                  merchantId={row.original.id}
+                  merchantName={row.original.business_name}
+                  label="Delete"
+                  compact
+                  onDeleted={handleMerchantDeleted}
+                />
+              </div>
+            ) : null}
           </div>
         ),
       },
@@ -154,7 +178,7 @@ export function MerchantManager({
         cell: ({ row }) => `${daysBetween(row.original.updated_at)}d`,
       },
     ],
-    [agentsById],
+    [agentsById, canDeleteMerchants, handleMerchantDeleted],
   );
 
   const table = useReactTable({
@@ -468,6 +492,21 @@ export function MerchantManager({
                   ))}
                 </Select>
               </Field>
+              {canDeleteMerchants ? (
+                <div className="rounded-[24px] border border-[#D57D25]/25 bg-[#D57D25]/10 p-3">
+                  <p className="text-sm font-semibold text-[#0B0F15]">Delete client</p>
+                  <p className="mt-1 text-sm leading-6 text-[#25425E]/75">
+                    Permanently remove this merchant and its related CRM records from the book.
+                  </p>
+                  <div className="mt-3">
+                    <DeleteMerchantButton
+                      merchantId={selectedMerchant.id}
+                      merchantName={selectedMerchant.business_name}
+                      onDeleted={handleMerchantDeleted}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}

@@ -146,6 +146,19 @@ with check (
   )
 );
 
+drop policy if exists "managers delete assigned merchants" on merchants;
+create policy "managers delete assigned merchants"
+on merchants for delete
+using (
+  is_admin()
+  or exists (
+    select 1
+    from agents a
+    where a.id = merchants.assigned_agent_id
+      and is_manager_for(a.profile_id)
+  )
+);
+
 drop policy if exists "merchant updates visible by merchant access" on merchant_updates;
 create policy "merchant updates visible by merchant access"
 on merchant_updates for select

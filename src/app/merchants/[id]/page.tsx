@@ -5,6 +5,7 @@ import { createMerchantUpdateAction, uploadMerchantDocumentAction } from "@/lib/
 import { getSessionContext } from "@/lib/auth";
 import { getMerchantDetailData } from "@/lib/data";
 import { AppShell } from "@/components/app-shell";
+import { DeleteMerchantButton } from "@/components/merchants/delete-merchant-button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,9 +52,19 @@ export default async function MerchantProfilePage({
                   <CardTitle>{detail.merchant.business_name}</CardTitle>
                   <CardDescription>{detail.merchant.industry ?? "Merchant"} profile and onboarding workspace</CardDescription>
                 </div>
-                <Badge tone={detail.merchant.status === "processing" ? "blue" : "slate"}>
-                  {titleCase(detail.merchant.status)}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={detail.merchant.status === "processing" ? "blue" : "slate"}>
+                    {titleCase(detail.merchant.status)}
+                  </Badge>
+                  {profile.role !== "agent" ? (
+                    <DeleteMerchantButton
+                      merchantId={detail.merchant.id}
+                      merchantName={detail.merchant.business_name}
+                      redirectTo="/merchants"
+                      compact
+                    />
+                  ) : null}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
