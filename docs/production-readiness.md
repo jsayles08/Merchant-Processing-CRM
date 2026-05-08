@@ -12,12 +12,14 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
   - `OPENAI_API_KEY`
   - `OPENAI_MODEL`
   - `CRON_SECRET`
+  - `MERCHANTDESK_API_KEY`
   - `NEXT_PUBLIC_APP_URL`
   - `NEXT_PUBLIC_COMPANY_NAME`
   - `NEXT_PUBLIC_PRODUCT_NAME`
   - `NEXT_PUBLIC_COMPANY_INITIALS`
   - `NEXT_PUBLIC_SUPPORT_EMAIL`
 - Confirm `/api/health` returns `200` in production.
+- Confirm `/api/health` reports `environment.merchantDeskApiKey = true` before connecting outside lead forms, dialers, or reporting tools.
 - Confirm `/api/health` reports `documents.publicUrlDocuments = 0`; any higher value means existing rows still point to old public URLs instead of private Supabase storage paths.
 - Configure Supabase Auth email templates and redirect URLs:
   - `https://your-domain.com/auth/callback`
@@ -43,6 +45,7 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
 ## Observability
 
 - Use Vercel Runtime Logs for `/api/health`, `/api/jobs/weekly-summary`, `/api/jobs/follow-up-reminders`, and Copilot routes.
+- Use Vercel Runtime Logs for `/api/merchants` and `/api/tasks` after connecting outside systems; failed calls should return JSON with `401`, `400`, `404`, `500`, or `503`.
 - Keep `/api/health` in uptime monitoring; it verifies Supabase admin connectivity and reports document storage migration counts.
 - Track `audit_logs` for sensitive business actions and `notification_deliveries` for reminder delivery outcomes.
 - Review `residual_import_batches` after every processor import for rejected rows or mismatched merchant names.
@@ -52,5 +55,6 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
 
 - Never commit `.env.local`.
 - Service role key must only run on the server.
+- `MERCHANTDESK_API_KEY` must only be shared with trusted server-side integrations and rotated if a vendor connection changes.
 - Agents should not be given admin role in Supabase.
 - Rotate credentials immediately when staff leave or secrets may have been exposed.

@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Building2, CheckCircle2, FileText, Mail, Phone, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { Building2, CheckCircle2, Download, FileText, Mail, Phone, PlugZap, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -192,6 +192,10 @@ export function MerchantManager({
   });
 
   const selectedMerchant = merchants.find((merchant) => merchant.id === selectedId) ?? merchants[0];
+  const visibleMerchants = table.getFilteredRowModel().rows.map((row) => row.original);
+  const visibleVolume = visibleMerchants.reduce((total, merchant) => total + Number(merchant.monthly_volume_estimate || 0), 0);
+  const visibleApprovals = visibleMerchants.filter((merchant) => requiresManagementApproval(Number(merchant.proposed_rate || 0))).length;
+  const visibleProcessing = visibleMerchants.filter((merchant) => merchant.status === "processing" || merchant.status === "onboarded").length;
 
   function updateField<TKey extends keyof FormState>(key: TKey, value: FormState[TKey]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -201,6 +205,78 @@ export function MerchantManager({
     setGlobalFilter("");
     setStageFilter("all");
     setAgentFilter("all");
+  }
+
+  function exportMerchantsCsv() {
+    const rows = table.getFilteredRowModel().rows.map((row) => row.original);
+
+    if (!rows.length) {
+      setMessage("There are no merchants to export with the current filters.");
+      return;
+    }
+
+    const headers = [
+      "Business Name",
+      "Contact",
+      "Email",
+      "Phone",
+      "Industry",
+      "Status",
+      "Assigned Agent",
+      "Monthly Volume",
+      "Average Ticket",
+      "Current Processor",
+      "Proposed Rate",
+      "Updated At",
+    ];
+    const lines = rows.map((merchant) =>
+      [
+        merchant.business_name,
+        merchant.contact_name,
+        merchant.contact_email,
+        merchant.contact_phone,
+        merchant.industry,
+        titleCase(merchant.status),
+        agentsById.get(merchant.assigned_agent_id) ?? "",
+        merchant.monthly_volume_estimate,
+        merchant.average_ticket,
+        merchant.current_processor,
+        merchant.proposed_rate,
+        merchant.updated_at,
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+    const blob = new Blob([[headers.map(csvCell).join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `merchantdesk-merchants-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage(`Exported ${rows.length} merchant${rows.length === 1 ? "" : "s"} to CSV.`);
+  }
+
+  async function copyIntegrationGuide() {
+    const origin = window.location.origin;
+    const guide = [
+      "MerchantDesk Integration API",
+      "",
+      "Add MERCHANTDESK_API_KEY in Vercel, then send it as:",
+      "Authorization: Bearer $MERCHANTDESK_API_KEY",
+      "",
+      `GET ${origin}/api/merchants?limit=25`,
+      `POST ${origin}/api/merchants`,
+      `GET ${origin}/api/tasks?status=open&limit=25`,
+      `POST ${origin}/api/tasks`,
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(guide);
+      setMessage("MerchantDesk API quick-start copied.");
+    } catch {
+      setMessage("API quick-start: call /api/merchants and /api/tasks with Authorization: Bearer $MERCHANTDESK_API_KEY.");
+    }
   }
 
   useEffect(() => {
@@ -290,7 +366,15 @@ export function MerchantManager({
               <CardTitle>Merchant Book</CardTitle>
               <CardDescription>Search, sort, add, and update merchant accounts.</CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Button variant="secondary" type="button" onClick={copyIntegrationGuide}>
+                <PlugZap className="h-4 w-4" />
+                API Ready
+              </Button>
+              <Button variant="secondary" type="button" onClick={exportMerchantsCsv}>
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
               <label className="relative block w-full min-w-0 sm:w-72">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -348,6 +432,11 @@ export function MerchantManager({
               </div>
             </div>
           ) : null}
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <MerchantSummary label="Visible accounts" value={visibleMerchants.length.toString()} detail={`${merchants.length} total in book`} />
+            <MerchantSummary label="Filtered volume" value={currency(visibleVolume)} detail={`${visibleProcessing} onboarded or processing`} />
+            <MerchantSummary label="Pricing alerts" value={visibleApprovals.toString()} detail="below management floor" />
+          </div>
           {table.getRowModel().rows.length ? (
             <div className="overflow-hidden rounded-[24px] border border-[#ABB7C0]/25 bg-white/50">
               <div className="overflow-x-auto">
@@ -534,6 +623,21 @@ function ProfileLine({ icon, label, value }: { icon: React.ReactNode; label: str
       <span className="min-w-0 truncate text-right font-semibold text-[#0B0F15]">{value}</span>
     </div>
   );
+}
+
+function MerchantSummary({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-[22px] border border-[#ABB7C0]/20 bg-white/55 px-4 py-3">
+      <p className="text-xs font-semibold uppercase text-[#25425E]/60">{label}</p>
+      <p className="mt-1 text-lg font-bold text-[#0B0F15]">{value}</p>
+      <p className="text-xs font-medium text-[#25425E]/65">{detail}</p>
+    </div>
+  );
+}
+
+function csvCell(value: string | number | null | undefined) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replaceAll("\"", "\"\"")}"` : text;
 }
 
 export function StatusBadge({ status }: { status: MerchantStatus }) {

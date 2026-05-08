@@ -25,6 +25,7 @@ Production-minded merchant processing CRM for agents, managers, and admins to ma
 - Agent Copilot with persisted messages/actions and confirmation endpoint for major writes
 - Weekly performance summary job endpoint and database function
 - Daily follow-up reminder job with in-app notifications plus optional Resend and Twilio delivery logs
+- Keyed integration APIs for merchant creation/listing and task creation/listing
 - Audit log foundation for merchant edits, pricing approvals, user creation, residual imports, reassignment, and Copilot confirmations
 - Manager assignment, bulk merchant reassignment, and processor residual CSV import workflows
 - Production health endpoint at `/api/health`
@@ -54,6 +55,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.2
 CRON_SECRET=
+MERCHANTDESK_API_KEY=
 NEXT_PUBLIC_APP_URL=
 NEXT_PUBLIC_COMPANY_NAME=
 NEXT_PUBLIC_PRODUCT_NAME=
@@ -66,7 +68,7 @@ TWILIO_AUTH_TOKEN=
 TWILIO_FROM_NUMBER=
 ```
 
-`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, and Twilio credentials are server-only and must never be exposed in client components.
+`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `MERCHANTDESK_API_KEY`, `RESEND_API_KEY`, and Twilio credentials are server-only and must never be exposed in client components.
 
 ## Supabase Setup
 
@@ -127,6 +129,29 @@ Currently supported confirmed writes:
 - add merchant timeline update
 - update merchant/deal stage
 
+## Integration API
+
+Create a long random `MERCHANTDESK_API_KEY` in Vercel before exposing these routes to outside systems. Every request must include one of these headers:
+
+```bash
+Authorization: Bearer $MERCHANTDESK_API_KEY
+# or
+X-MerchantDesk-API-Key: $MERCHANTDESK_API_KEY
+```
+
+Available integration routes:
+
+```bash
+GET /api/merchants?search=&status=&agentId=&limit=50&offset=0
+POST /api/merchants
+GET /api/tasks?status=open&assignedTo=&merchantId=&limit=50&offset=0
+POST /api/tasks
+```
+
+`POST /api/merchants` accepts `assigned_agent_id` or `assigned_agent_email`. Successful merchant creation also creates the deal record, notifies the assigned agent, and writes an audit log.
+
+`POST /api/tasks` accepts `assigned_to` or `assigned_to_email`. Successful task creation creates the assignee notification and writes an audit log.
+
 ## Weekly Summary Job
 
 The secured route below calls the Postgres summary function and creates notifications:
@@ -174,6 +199,7 @@ When you are ready to connect the real services, I need:
 - OpenAI API key
 - Preferred production app URL
 - A long random `CRON_SECRET`
+- A long random `MERCHANTDESK_API_KEY` for integration routes
 - The first admin user's Supabase Auth email or user ID so we can attach the admin profile
 
 ## Compensation Rules

@@ -10,6 +10,10 @@ export function isOpenAIConfigured() {
   return Boolean(process.env.OPENAI_API_KEY);
 }
 
+export function isMerchantDeskApiConfigured() {
+  return Boolean(process.env.MERCHANTDESK_API_KEY);
+}
+
 export function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
@@ -22,5 +26,6 @@ export function getEnvironmentReport() {
     supabaseServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     openaiApiKey: isOpenAIConfigured(),
     cronSecret: Boolean(process.env.CRON_SECRET),
+    merchantDeskApiKey: isMerchantDeskApiConfigured(),
   };
 }
