@@ -1,6 +1,6 @@
 import { Suspense } from "react";
-import { Landmark } from "lucide-react";
 import { requestPasswordResetAction, signInAction } from "@/app/login/actions";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/field";
@@ -25,9 +25,7 @@ async function LoginForm({ searchParams }: { searchParams: Promise<{ error?: str
     <main className="crm-shell-bg flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E9D7A1] text-[#0B0F15] shadow-inner ring-1 ring-black/5">
-            <Landmark className="h-6 w-6" />
-          </div>
+          <BrandLogo className="mb-4 h-auto w-52 object-contain" priority />
           <CardTitle>Sign in to {brand.companyName}</CardTitle>
           <CardDescription>Use your company-issued agent or manager account.</CardDescription>
         </CardHeader>

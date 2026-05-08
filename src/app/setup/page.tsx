@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/brand-logo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { brand } from "@/lib/branding";
 
@@ -6,6 +7,7 @@ export default function SetupPage() {
     <main className="crm-shell-bg flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-2xl">
         <CardHeader>
+          <BrandLogo className="mb-4 h-auto w-52 object-contain" priority />
           <CardTitle>Connect {brand.companyName}</CardTitle>
           <CardDescription>The app is ready for real Supabase and OpenAI credentials.</CardDescription>
         </CardHeader>

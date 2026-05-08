@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: brand.companyName,
   description: `${brand.productName} for agents, managers, and admins.`,
+  icons: {
+    icon: "/merchantdesk-mark.png",
+    shortcut: "/merchantdesk-mark.png",
+    apple: "/merchantdesk-mark.png",
+  },
 };
 
 export default function RootLayout({

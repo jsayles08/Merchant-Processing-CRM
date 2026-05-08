@@ -21,6 +21,7 @@ import {
   Upload,
 } from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
+import { BrandLogo } from "@/components/brand-logo";
 import { HeaderActions } from "@/components/header-actions";
 import { brand } from "@/lib/branding";
 import type { Profile } from "@/lib/types";
@@ -74,16 +75,8 @@ export function AppShell({
         <header className="sticky top-0 z-30 border-b border-white/65 bg-[#FDFDFD]/72 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-4">
-              <Link href="/" className="group flex items-center gap-3">
-                <div className="relative flex h-11 w-11 items-center justify-center rounded-[18px] bg-white shadow-inner ring-1 ring-[#ABB7C0]/25">
-                  <span className="absolute h-5 w-5 rounded-full bg-[#0E5EC9] opacity-95 transition group-hover:scale-110" />
-                  <span className="absolute h-5 w-5 translate-x-2 rounded-full bg-[#D57D25] opacity-95 transition group-hover:scale-110" />
-                  <span className="relative text-sm font-black text-[#0B0F15]">{brand.initials.slice(0, 1)}</span>
-                </div>
-                <div>
-                  <p className="text-xl font-black text-[#0B0F15]">{brand.productName}</p>
-                  <p className="text-xs font-medium text-[#25425E]/70">{brand.companyName}</p>
-                </div>
+              <Link href="/" className="group flex min-w-[8.5rem] items-center" aria-label={`${brand.productName} home`}>
+                <BrandLogo className="h-16 w-auto object-contain" priority />
               </Link>
 
               <nav className="hidden items-center gap-3 xl:flex">
