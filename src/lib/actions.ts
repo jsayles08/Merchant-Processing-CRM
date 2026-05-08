@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
@@ -31,14 +32,14 @@ const MerchantInput = z.object({
 });
 
 const CreateTeamMemberInput = z.object({
-  full_name: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().optional(),
+  full_name: z.string().trim().min(1),
+  email: z.string().trim().email().transform((email) => email.toLowerCase()),
+  phone: z.string().trim().optional(),
   role: z.enum(["admin", "manager", "agent"]),
   status: z.enum(["active", "invited", "inactive"]).default("active"),
-  manager_id: z.string().optional(),
-  agent_code: z.string().optional(),
-  sponsor_agent_id: z.string().optional(),
+  manager_id: z.preprocess((value) => (value === "" ? undefined : value), z.string().uuid().optional()),
+  agent_code: z.string().trim().optional(),
+  sponsor_agent_id: z.preprocess((value) => (value === "" ? undefined : value), z.string().uuid().optional()),
   temp_password: z.string().min(8),
 });
 
@@ -368,20 +369,26 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
     return { ok: false, message: "Complete the required user fields." };
   }
 
-  const { supabase, profile } = await getSessionContext();
+  const { profile } = await getSessionContext();
 
   if (profile.role !== "admin") {
     return { ok: false, message: "Only admins can create users and agents." };
   }
 
-  const adminSupabase = createAdminClient();
+  let adminSupabase: SupabaseClient;
+  try {
+    adminSupabase = createAdminClient();
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Supabase admin client is not configured." };
+  }
+
   const listed = await adminSupabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
 
   if (listed.error) {
     return { ok: false, message: listed.error.message };
   }
 
-  let userId = listed.data.users.find((user) => user.email === parsed.data.email)?.id;
+  let userId = listed.data.users.find((user) => user.email?.toLowerCase() === parsed.data.email)?.id;
 
   if (!userId) {
     const created = await adminSupabase.auth.admin.createUser({
@@ -407,20 +414,21 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
     }
   }
 
-  const { data: profileRow, error: profileError } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        user_id: userId,
-        full_name: parsed.data.full_name,
-        email: parsed.data.email,
-        role: parsed.data.role,
-        phone: parsed.data.phone || null,
-        status: parsed.data.status,
-        manager_id: parsed.data.manager_id || null,
-      },
-      { onConflict: "email" },
-    )
+  const profilePayload = {
+    user_id: userId,
+    full_name: parsed.data.full_name,
+    email: parsed.data.email,
+    role: parsed.data.role,
+    phone: parsed.data.phone || null,
+    status: parsed.data.status,
+    manager_id: parsed.data.manager_id || null,
+  };
+  const existingProfile = await findExistingProfile(adminSupabase, userId, parsed.data.email);
+  const profileWrite = existingProfile
+    ? adminSupabase.from("profiles").update(profilePayload).eq("id", existingProfile.id)
+    : adminSupabase.from("profiles").insert(profilePayload);
+
+  const { data: profileRow, error: profileError } = await profileWrite
     .select("*")
     .single<{ id: string }>();
 
@@ -429,16 +437,22 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
   }
 
   if (parsed.data.role === "agent") {
-    const teamAssignment = await resolveTeamAssignment(supabase, parsed.data.sponsor_agent_id || null);
+    let teamAssignment: Awaited<ReturnType<typeof resolveTeamAssignment>>;
+    try {
+      teamAssignment = await resolveTeamAssignment(adminSupabase, parsed.data.sponsor_agent_id || null);
+    } catch (error) {
+      return { ok: false, message: error instanceof Error ? error.message : "Unable to resolve team assignment." };
+    }
+
     const agentCode =
       parsed.data.agent_code?.trim() ||
-      `CV-${parsed.data.full_name
+      `MD-${parsed.data.full_name
         .split(/\s+/)
         .map((part) => part[0])
         .join("")
         .toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
-    const { data: agentRow, error: agentError } = await supabase
+    const { data: agentRow, error: agentError } = await adminSupabase
       .from("agents")
       .upsert(
         {
@@ -460,7 +474,7 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
     }
 
     if (teamAssignment.teamId && parsed.data.sponsor_agent_id) {
-      const { error: memberError } = await supabase.from("team_members").upsert(
+      const { error: memberError } = await adminSupabase.from("team_members").upsert(
         {
           team_id: teamAssignment.teamId,
           agent_id: agentRow.id,
@@ -476,7 +490,7 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
     }
   }
 
-  await writeAuditLog(supabase, profile, {
+  await writeAuditLog(adminSupabase, profile, {
     action: "user.upsert",
     entityType: "profile",
     entityId: profileRow.id,
@@ -485,6 +499,7 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
   });
 
   revalidatePath("/");
+  revalidatePath("/settings");
   return { ok: true, message: `${parsed.data.full_name} is ready to use ${brand.companyName}.` };
 }
 
@@ -776,7 +791,7 @@ export async function markAllNotificationsReadAction(): Promise<ActionResult> {
 }
 
 async function resolveTeamAssignment(
-  supabase: Awaited<ReturnType<typeof getSessionContext>>["supabase"],
+  supabase: SupabaseClient,
   sponsorAgentId: string | null,
 ) {
   if (!sponsorAgentId) {
@@ -822,4 +837,24 @@ async function resolveTeamAssignment(
     agentTeamPosition: 2,
     teamId: newTeam.id,
   };
+}
+
+async function findExistingProfile(supabase: SupabaseClient, userId: string, email: string) {
+  const { data: profileByUserId, error: userError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle<{ id: string }>();
+
+  if (userError) throw userError;
+  if (profileByUserId) return profileByUserId;
+
+  const { data: profileByEmail, error: emailError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle<{ id: string }>();
+
+  if (emailError) throw emailError;
+  return profileByEmail ?? null;
 }

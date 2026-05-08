@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { ArrowRightLeft, KeyRound, UserPlus, UsersRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRightLeft, KeyRound, Sparkles, UserPlus, UsersRound } from "lucide-react";
 import { bulkAssignProfilesToManagerAction, bulkReassignMerchantsAction, createTeamMemberAction } from "@/lib/actions";
 import type { CrmData, Profile, Role } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ type UserForm = {
 };
 
 export function AdminSettings({ data, currentProfile }: { data: CrmData; currentProfile: Profile }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>([]);
@@ -63,6 +65,11 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
   }
 
   function createUser() {
+    if (!form.full_name.trim() || !form.email.trim() || form.temp_password.length < 8) {
+      setMessage("Add a name, valid email, and temporary password with at least 8 characters.");
+      return;
+    }
+
     startTransition(async () => {
       const result = await createTeamMemberAction({
         ...form,
@@ -82,8 +89,18 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
           sponsor_agent_id: "",
           temp_password: "",
         });
+        router.refresh();
       }
     });
+  }
+
+  function generatePassword() {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const symbols = "!@$%";
+    const password = Array.from({ length: 14 }, () => alphabet[crypto.getRandomValues(new Uint32Array(1))[0] % alphabet.length]).join("");
+    const finalPassword = `${password}${symbols[crypto.getRandomValues(new Uint32Array(1))[0] % symbols.length]}8`;
+    update("temp_password", finalPassword);
+    setMessage("Temporary password generated. Share it with the new user through a secure channel.");
   }
 
   function toggleProfile(profileId: string) {
@@ -131,10 +148,10 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <Field label="Full name">
-              <Input value={form.full_name} onChange={(event) => update("full_name", event.target.value)} />
+              <Input value={form.full_name} onChange={(event) => update("full_name", event.target.value)} placeholder="Jane Doe" />
             </Field>
             <Field label="Email">
-              <Input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} />
+              <Input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="jane@company.com" />
             </Field>
             <Field label="Phone">
               <Input value={form.phone} onChange={(event) => update("phone", event.target.value)} />
@@ -174,7 +191,18 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
               </>
             ) : null}
             <Field label="Temporary password">
-              <Input type="password" value={form.temp_password} onChange={(event) => update("temp_password", event.target.value)} />
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  value={form.temp_password}
+                  onChange={(event) => update("temp_password", event.target.value)}
+                  placeholder="Minimum 8 characters"
+                />
+                <Button variant="secondary" type="button" onClick={generatePassword} disabled={isPending}>
+                  <Sparkles className="h-4 w-4" />
+                  Generate
+                </Button>
+              </div>
             </Field>
           </div>
           {message ? <p className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">{message}</p> : null}

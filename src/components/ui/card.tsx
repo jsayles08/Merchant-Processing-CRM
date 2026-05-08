@@ -5,7 +5,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "crm-card rounded-[30px]",
+        "crm-card crm-animate-pop rounded-[30px]",
         className,
       )}
       {...props}

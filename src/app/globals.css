@@ -50,14 +50,82 @@ html {
   background: rgb(253 253 253 / 78%);
   box-shadow: 0 20px 54px rgb(11 15 21 / 8%);
   backdrop-filter: blur(18px);
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease;
 }
 
 .crm-panel {
   border: 1px solid rgb(171 183 192 / 34%);
   background: rgb(255 255 255 / 58%);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .crm-soft {
   background: rgb(255 255 255 / 44%);
   border: 1px solid rgb(171 183 192 / 24%);
+}
+
+.crm-animate-page {
+  animation: crm-fade-up 360ms ease both;
+}
+
+.crm-animate-pop {
+  animation: crm-pop 260ms ease both;
+}
+
+.crm-card:hover {
+  transform: translateY(-2px);
+  border-color: rgb(255 255 255 / 96%);
+  box-shadow: 0 26px 64px rgb(11 15 21 / 11%);
+}
+
+.crm-panel:hover {
+  background: rgb(255 255 255 / 72%);
+  border-color: rgb(171 183 192 / 48%);
+}
+
+@keyframes crm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes crm-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+
+  .crm-card:hover {
+    transform: none;
+  }
 }

@@ -54,7 +54,7 @@ const railItems: NavItem[] = [
 ];
 
 const headerIconClassName =
-  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ABB7C0]/25 bg-white/70 text-[#0B0F15] shadow-inner ring-1 ring-white/50 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#0E5EC9]/20";
+  "inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ABB7C0]/25 bg-white/70 text-[#0B0F15] shadow-inner ring-1 ring-white/50 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white active:translate-y-0 active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#0E5EC9]/20";
 
 export function AppShell({
   children,
@@ -86,7 +86,7 @@ export function AppShell({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`rounded-full px-5 py-3 text-sm font-semibold transition ${
+                      className={`rounded-full px-5 py-3 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
                       active
                         ? "bg-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]"
                           : "text-[#25425E] hover:bg-white/70 hover:text-[#0B0F15]"
@@ -141,7 +141,7 @@ export function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
                       active ? "bg-black text-white" : "bg-white/65 text-[#25425E]"
                     }`}
                   >
@@ -165,7 +165,7 @@ export function AppShell({
                   href={item.href}
                   aria-label={item.label}
                   title={item.label}
-                  className={`group/rail-link relative flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D7A1]/75 ${
+                  className={`group/rail-link relative flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D7A1]/75 ${
                     active
                       ? "bg-[#E9D7A1] text-[#0B0F15]"
                       : "text-white/90 hover:bg-white hover:text-[#0B0F15] focus-visible:bg-white focus-visible:text-[#0B0F15]"
@@ -184,7 +184,7 @@ export function AppShell({
             })}
           </aside>
 
-          <main className="min-h-[calc(100vh-8rem)] px-4 py-6 sm:px-6 lg:px-8 xl:pl-28">
+          <main className="crm-animate-page min-h-[calc(100vh-8rem)] px-4 py-6 sm:px-6 lg:px-8 xl:pl-28">
             <div className="hidden pb-6 xl:block">
               <p className="text-xs font-semibold uppercase text-[#25425E]/70">{eyebrow}</p>
               <h1 className="mt-1 text-4xl font-black text-[#0B0F15]">{title}</h1>
