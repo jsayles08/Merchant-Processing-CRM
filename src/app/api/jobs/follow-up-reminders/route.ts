@@ -60,7 +60,7 @@ async function runFollowUpReminderJob(request: Request) {
           profile_id: profile.id,
           title,
           body,
-          url: task.merchant_id ? `/merchants/${task.merchant_id}` : "/",
+          url: task.merchant_id ? `/merchants/${task.merchant_id}` : "/dashboard",
           dedupe_key: dedupeKey,
         },
         { onConflict: "dedupe_key", ignoreDuplicates: true },
@@ -75,7 +75,7 @@ async function runFollowUpReminderJob(request: Request) {
           profile_id: profile.id,
           title,
           body,
-          url: task.merchant_id ? `/merchants/${task.merchant_id}` : "/",
+          url: task.merchant_id ? `/merchants/${task.merchant_id}` : "/dashboard",
         })
         .select("id")
         .maybeSingle<{ id: string }>();
@@ -91,7 +91,7 @@ async function runFollowUpReminderJob(request: Request) {
       profile: profile as Pick<Profile, "id" | "email" | "phone" | "full_name">,
       title,
       body,
-      url: task.merchant_id ? `/merchants/${task.merchant_id}` : "/",
+      url: task.merchant_id ? `/merchants/${task.merchant_id}` : "/dashboard",
     });
   }
 

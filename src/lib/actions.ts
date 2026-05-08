@@ -135,7 +135,7 @@ export async function createMerchantAction(input: unknown): Promise<ActionResult
     metadata: { assigned_agent_id: assignedAgentId, status: parsed.data.status },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true, message: `${parsed.data.business_name} was created.`, data: merchant };
 }
 
@@ -161,7 +161,7 @@ export async function updateMerchantStatusAction(merchantId: string, status: Mer
     metadata: { status },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath(`/merchants/${merchantId}`);
   return { ok: true, message: "Merchant stage updated." };
 }
@@ -248,7 +248,7 @@ export async function deleteMerchantAction(merchantId: string): Promise<ActionRe
     },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/merchants");
   revalidatePath(`/merchants/${merchantId}`);
   revalidatePath("/documents");
@@ -293,7 +293,7 @@ export async function createMerchantUpdateAction(formData: FormData): Promise<Ac
     metadata: { update_type: updateType, next_follow_up_date: nextFollowUpDate || null },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath(`/merchants/${merchantId}`);
   return { ok: true, message: "Merchant update saved." };
 }
@@ -317,7 +317,7 @@ export async function approveDealAction(dealId: string, approvalStatus: "approve
     metadata: { approval_status: approvalStatus },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true, message: `Deal ${approvalStatus}.` };
 }
 
@@ -498,7 +498,7 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
     metadata: { role: parsed.data.role, status: parsed.data.status, manager_id: parsed.data.manager_id || null },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/settings");
   return { ok: true, message: `${parsed.data.full_name} is ready to use ${brand.companyName}.` };
 }
@@ -543,7 +543,7 @@ export async function bulkAssignProfilesToManagerAction(input: unknown): Promise
     metadata: { profile_ids: parsed.data.profile_ids, manager_id: managerId },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true, message: `Updated ${data?.length ?? 0} manager assignments.` };
 }
 
@@ -591,7 +591,7 @@ export async function bulkReassignMerchantsAction(input: unknown): Promise<Actio
     },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true, message: `Reassigned ${merchantIds.length} merchants.` };
 }
 
@@ -700,7 +700,7 @@ export async function importResidualReportAction(input: unknown): Promise<Action
     metadata: { imported_count: residualRows.length, error_count: errors.length, statement_month: statementMonth },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return {
     ok: status === "completed",
     message: errors.length
@@ -747,7 +747,7 @@ export async function createTaskAction(input: unknown): Promise<ActionResult> {
     dedupe_key: `task-created:${data.id}`,
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/notifications");
   return { ok: true, message: "Task created.", data };
 }
@@ -758,7 +758,7 @@ export async function updateTaskStatusAction(taskId: string, status: TaskStatus)
 
   if (error) return { ok: false, message: error.message };
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return { ok: true, message: "Task updated.", data };
 }
 

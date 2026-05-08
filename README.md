@@ -16,7 +16,8 @@ Production-minded merchant processing CRM for agents, managers, and admins to ma
 - Protected Supabase auth flow with role-backed profiles
 - Password reset and recovery flow through Supabase Auth
 - Server-rendered CRM data behind Supabase RLS
-- Dashboard with volume, residual, payout, forecast, agent, and recommendation cards
+- Public landing page at `/` with invite-only sign-in routing
+- Protected dashboard at `/dashboard` with volume, residual, payout, forecast, agent, and recommendation cards
 - Merchant CRUD workflow with Supabase server actions and pricing-floor flags
 - Merchant detail routes with update timelines, automatic follow-up task creation, and document upload
 - Kanban-style pipeline board with persisted stage changes
@@ -42,7 +43,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3000` for the public landing page. Signed-in users enter the CRM at `http://localhost:3000/dashboard`.
 
 The production app requires Supabase environment variables. Without them, it redirects to `/setup`.
 

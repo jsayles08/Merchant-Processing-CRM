@@ -198,7 +198,7 @@ export async function POST(
     },
   });
 
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/copilot");
   revalidatePath("/messages");
   revalidatePath("/merchants");

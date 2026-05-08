@@ -15,7 +15,7 @@ export default function NotFound() {
         </CardHeader>
         <CardContent>
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex h-10 items-center justify-center rounded-full bg-[#0B0F15] px-4 text-sm font-semibold text-white shadow-sm shadow-[#0B0F15]/10 transition hover:bg-[#25425E]"
           >
             Return to Dashboard

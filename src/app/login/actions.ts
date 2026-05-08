@@ -15,7 +15,7 @@ export async function signInAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/");
+  redirect("/dashboard");
 }
 
 export async function signOutAction() {

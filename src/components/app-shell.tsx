@@ -33,7 +33,7 @@ type NavItem = {
 };
 
 const topNavItems: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/" },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Merchants", icon: BriefcaseBusiness, href: "/merchants" },
   { label: "Opportunities", icon: Gauge, href: "/opportunities" },
   { label: "Tasks", icon: ClipboardList, href: "/tasks" },
@@ -61,7 +61,7 @@ export function AppShell({
   profile,
   title = "Dashboard",
   eyebrow = "MerchantDesk",
-  activeHref = "/",
+  activeHref = "/dashboard",
 }: {
   children: React.ReactNode;
   profile?: Profile;
@@ -75,13 +75,13 @@ export function AppShell({
         <header className="sticky top-0 z-30 border-b border-white/65 bg-[#FDFDFD]/72 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-4">
-              <Link href="/" className="group flex min-w-[8.5rem] items-center" aria-label={`${brand.productName} home`}>
+              <Link href="/dashboard" className="group flex min-w-[8.5rem] items-center" aria-label={`${brand.productName} dashboard`}>
                 <BrandLogo className="h-16 w-auto object-contain" priority />
               </Link>
 
               <nav className="hidden items-center gap-3 xl:flex">
                 {topNavItems.map((item) => {
-                  const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
+                  const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
                   return (
                     <Link
                       key={item.href}
@@ -135,7 +135,7 @@ export function AppShell({
             </div>
             <nav className="flex gap-2 overflow-x-auto pb-1">
               {topNavItems.map((item) => {
-                const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
+                const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
                 const Icon = item.icon;
                 return (
                   <Link
@@ -158,7 +158,7 @@ export function AppShell({
           <aside className="fixed left-5 top-[8.5rem] z-20 hidden max-h-[calc(100vh-10rem)] overflow-visible rounded-full bg-[#0B0F15]/95 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:items-start xl:gap-2">
             {railItems.map((item) => {
               const Icon = item.icon;
-              const active = activeHref === item.href || (item.href !== "/" && activeHref.startsWith(item.href));
+              const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={`${item.href}-${item.label}`}

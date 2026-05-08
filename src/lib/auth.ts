@@ -32,6 +32,6 @@ export async function getSessionContext() {
 
 export function requireRole(profile: Profile, roles: Profile["role"][]) {
   if (!roles.includes(profile.role)) {
-    redirect("/");
+    redirect("/dashboard");
   }
 }
