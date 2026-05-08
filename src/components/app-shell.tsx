@@ -172,16 +172,18 @@ export function AppShell({
                   href={item.href}
                   aria-label={item.label}
                   title={item.label}
-                  className={`group/rail-link flex h-11 w-11 min-w-[2.75rem] items-center overflow-hidden whitespace-nowrap rounded-full transition-all duration-200 ease-out hover:w-48 hover:pr-4 focus-visible:w-48 focus-visible:pr-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D7A1]/75 ${
+                  className={`group/rail-link relative flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D7A1]/75 ${
                     active
                       ? "bg-[#E9D7A1] text-[#0B0F15]"
                       : "text-white/90 hover:bg-white hover:text-[#0B0F15] focus-visible:bg-white focus-visible:text-[#0B0F15]"
                   }`}
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="max-w-0 overflow-hidden text-sm font-semibold opacity-0 transition-all duration-200 ease-out group-hover/rail-link:ml-1 group-hover/rail-link:max-w-[9rem] group-hover/rail-link:opacity-100 group-focus-visible/rail-link:ml-1 group-focus-visible/rail-link:max-w-[9rem] group-focus-visible/rail-link:opacity-100">
+                  <Icon className="h-4 w-4" />
+                  <span
+                    className={`pointer-events-none absolute left-[calc(100%+0.7rem)] top-1/2 z-30 -translate-y-1/2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-semibold opacity-0 shadow-lg ring-1 ring-black/5 transition-opacity duration-150 ease-out group-hover/rail-link:opacity-100 group-focus-visible/rail-link:opacity-100 ${
+                      active ? "bg-[#E9D7A1] text-[#0B0F15]" : "bg-white text-[#0B0F15]"
+                    }`}
+                  >
                     {item.label}
                   </span>
                 </Link>
