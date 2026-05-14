@@ -68,3 +68,99 @@ values
   ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', false),
   ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', false)
 on conflict (team_id, agent_id) do nothing;
+
+insert into agent_recruits (
+  id,
+  full_name,
+  email,
+  phone,
+  source,
+  status,
+  assigned_recruiter_id,
+  created_by,
+  follow_up_at,
+  notes
+)
+values
+  ('40000000-0000-0000-0000-000000000001', 'Taylor Morgan', 'taylor@agentcandidate.example', '(716) 555-0201', 'Referral', 'interested', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', now() + interval '2 days', 'Experienced in restaurant POS sales. Wants override details.'),
+  ('40000000-0000-0000-0000-000000000002', 'Sam Rivera', 'sam@agentcandidate.example', '(716) 555-0202', 'LinkedIn', 'application_started', '00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002', now() + interval '5 days', 'Submitted initial questionnaire and needs agreement review.')
+on conflict (id) do nothing;
+
+insert into agent_recruit_updates (id, recruit_id, author_profile_id, status, note, follow_up_at)
+values
+  ('41000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003', 'interested', 'Reviewed income goals and explained merchant activation requirements.', now() + interval '2 days'),
+  ('41000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000002', 'application_started', 'Application started; waiting on signed agent agreement.', now() + interval '5 days')
+on conflict (id) do nothing;
+
+insert into agent_onboarding_records (
+  id,
+  recruit_id,
+  full_name,
+  email,
+  phone,
+  assigned_admin_id,
+  status,
+  profile_complete,
+  training_progress,
+  documents_signed
+)
+values
+  ('50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000002', 'Sam Rivera', 'sam@agentcandidate.example', '(716) 555-0202', '00000000-0000-0000-0000-000000000001', 'documents_pending', true, 50, false)
+on conflict (id) do nothing;
+
+insert into agent_onboarding_steps (onboarding_id, title, step_order, completed_at)
+values
+  ('50000000-0000-0000-0000-000000000001', 'Complete agent profile', 1, now() - interval '1 day'),
+  ('50000000-0000-0000-0000-000000000001', 'Review merchant processing training', 2, now() - interval '12 hours'),
+  ('50000000-0000-0000-0000-000000000001', 'Sign agent agreement', 3, null),
+  ('50000000-0000-0000-0000-000000000001', 'Submit payout and tax details', 4, null),
+  ('50000000-0000-0000-0000-000000000001', 'Admin review and approval', 5, null),
+  ('50000000-0000-0000-0000-000000000001', 'Activate CRM access', 6, null)
+on conflict (onboarding_id, step_order) do nothing;
+
+insert into merchant_onboarding_records (
+  id,
+  merchant_id,
+  business_name,
+  contact_name,
+  contact_email,
+  contact_phone,
+  industry,
+  processing_needs,
+  monthly_volume_estimate,
+  average_ticket,
+  current_processor,
+  status,
+  assigned_agent_id,
+  follow_up_at,
+  notes
+)
+values
+  ('60000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000002', 'Buffalo Auto Detail', 'Sarah Mills', 'sarah@buffaloauto.example', '(716) 555-0139', 'Auto Services', 'Needs card-present, invoicing, and next-day funding comparison.', 62000, 185, 'Square', 'under_review', '10000000-0000-0000-0000-000000000001', now() + interval '1 day', 'Manager pricing review is still pending.')
+on conflict (id) do nothing;
+
+insert into merchant_onboarding_steps (onboarding_id, title, step_order, completed_at)
+values
+  ('60000000-0000-0000-0000-000000000001', 'Capture business and ownership details', 1, now() - interval '2 days'),
+  ('60000000-0000-0000-0000-000000000001', 'Confirm processing needs', 2, now() - interval '2 days'),
+  ('60000000-0000-0000-0000-000000000001', 'Collect statements and void check', 3, now() - interval '1 day'),
+  ('60000000-0000-0000-0000-000000000001', 'Submit processor application', 4, null),
+  ('60000000-0000-0000-0000-000000000001', 'Underwriting review', 5, null),
+  ('60000000-0000-0000-0000-000000000001', 'Board account and schedule first batch', 6, null)
+on conflict (onboarding_id, step_order) do nothing;
+
+insert into signature_requests (
+  id,
+  title,
+  recipient_name,
+  recipient_email,
+  related_entity_type,
+  related_entity_id,
+  provider,
+  status,
+  created_by,
+  sent_at
+)
+values
+  ('70000000-0000-0000-0000-000000000001', 'Merchant processing agreement', 'Sarah Mills', 'sarah@buffaloauto.example', 'merchant', '20000000-0000-0000-0000-000000000002', 'mock', 'sent', '00000000-0000-0000-0000-000000000003', now() - interval '4 hours')
+on conflict (id) do nothing;

@@ -15,6 +15,33 @@ export type MerchantStatus =
 export type ApprovalStatus = "not_required" | "pending" | "approved" | "denied";
 export type Priority = "low" | "medium" | "high";
 export type TaskStatus = "open" | "completed" | "overdue";
+export type RecruitStatus =
+  | "new_lead"
+  | "contacted"
+  | "interested"
+  | "application_started"
+  | "onboarding"
+  | "active"
+  | "rejected";
+export type AgentOnboardingStatus =
+  | "invited"
+  | "profile_incomplete"
+  | "training"
+  | "documents_pending"
+  | "under_review"
+  | "approved"
+  | "active";
+export type MerchantOnboardingStatus =
+  | "lead"
+  | "contacted"
+  | "application_started"
+  | "documents_needed"
+  | "under_review"
+  | "approved"
+  | "active"
+  | "declined";
+export type SignatureStatus = "draft" | "sent" | "viewed" | "signed" | "declined" | "expired";
+export type SignatureEntityType = "agent" | "recruit" | "merchant" | "account";
 
 export type Profile = {
   id: string;
@@ -109,6 +136,110 @@ export type Document = {
   created_at: string;
 };
 
+export type AgentRecruit = {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  source: string | null;
+  status: RecruitStatus;
+  assigned_recruiter_id: string | null;
+  created_by: string | null;
+  follow_up_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentRecruitUpdate = {
+  id: string;
+  recruit_id: string;
+  author_profile_id: string | null;
+  status: RecruitStatus | null;
+  note: string;
+  follow_up_at: string | null;
+  created_at: string;
+};
+
+export type AgentOnboardingRecord = {
+  id: string;
+  profile_id: string | null;
+  recruit_id: string | null;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  assigned_admin_id: string | null;
+  status: AgentOnboardingStatus;
+  profile_complete: boolean;
+  training_progress: number;
+  documents_signed: boolean;
+  account_activated: boolean;
+  admin_approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentOnboardingStep = {
+  id: string;
+  onboarding_id: string;
+  title: string;
+  description: string | null;
+  step_order: number;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type MerchantOnboardingRecord = {
+  id: string;
+  merchant_id: string | null;
+  business_name: string;
+  contact_name: string;
+  contact_email: string | null;
+  contact_phone: string | null;
+  industry: string | null;
+  processing_needs: string | null;
+  monthly_volume_estimate: number;
+  average_ticket: number;
+  current_processor: string | null;
+  status: MerchantOnboardingStatus;
+  assigned_agent_id: string | null;
+  follow_up_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MerchantOnboardingStep = {
+  id: string;
+  onboarding_id: string;
+  title: string;
+  description: string | null;
+  step_order: number;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type SignatureRequest = {
+  id: string;
+  title: string;
+  recipient_name: string;
+  recipient_email: string;
+  recipient_profile_id: string | null;
+  related_entity_type: SignatureEntityType;
+  related_entity_id: string | null;
+  document_id: string | null;
+  provider: string;
+  provider_request_id: string | null;
+  signing_url: string | null;
+  status: SignatureStatus;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+  sent_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Residual = {
   id: string;
   merchant_id: string;
@@ -171,6 +302,13 @@ export type CrmData = {
   merchantUpdates: MerchantUpdate[];
   tasks: Task[];
   documents: Document[];
+  agentRecruits: AgentRecruit[];
+  agentRecruitUpdates: AgentRecruitUpdate[];
+  agentOnboardingRecords: AgentOnboardingRecord[];
+  agentOnboardingSteps: AgentOnboardingStep[];
+  merchantOnboardingRecords: MerchantOnboardingRecord[];
+  merchantOnboardingSteps: MerchantOnboardingStep[];
+  signatureRequests: SignatureRequest[];
   residuals: Residual[];
   residualImportBatches: ResidualImportBatch[];
   teams: Team[];

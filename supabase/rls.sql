@@ -5,6 +5,13 @@ alter table merchant_updates enable row level security;
 alter table deals enable row level security;
 alter table tasks enable row level security;
 alter table documents enable row level security;
+alter table agent_recruits enable row level security;
+alter table agent_recruit_updates enable row level security;
+alter table agent_onboarding_records enable row level security;
+alter table agent_onboarding_steps enable row level security;
+alter table merchant_onboarding_records enable row level security;
+alter table merchant_onboarding_steps enable row level security;
+alter table signature_requests enable row level security;
 alter table residuals enable row level security;
 alter table residual_import_batches enable row level security;
 alter table teams enable row level security;
@@ -273,6 +280,279 @@ drop policy if exists "documents insert by uploader" on documents;
 create policy "documents insert by uploader"
 on documents for insert
 with check (is_admin() or uploaded_by = current_profile_id());
+
+drop policy if exists "agent recruits visible by recruiter" on agent_recruits;
+create policy "agent recruits visible by recruiter"
+on agent_recruits for select
+using (
+  is_admin()
+  or created_by = current_profile_id()
+  or assigned_recruiter_id = current_profile_id()
+  or exists (
+    select 1
+    from profiles p
+    where p.id = agent_recruits.assigned_recruiter_id
+      and p.manager_id = current_profile_id()
+  )
+);
+
+drop policy if exists "agent recruits writable by recruiter" on agent_recruits;
+create policy "agent recruits writable by recruiter"
+on agent_recruits for all
+using (
+  is_admin()
+  or created_by = current_profile_id()
+  or assigned_recruiter_id = current_profile_id()
+  or exists (
+    select 1
+    from profiles p
+    where p.id = agent_recruits.assigned_recruiter_id
+      and p.manager_id = current_profile_id()
+  )
+)
+with check (
+  is_admin()
+  or created_by = current_profile_id()
+  or assigned_recruiter_id = current_profile_id()
+  or exists (
+    select 1
+    from profiles p
+    where p.id = agent_recruits.assigned_recruiter_id
+      and p.manager_id = current_profile_id()
+  )
+);
+
+drop policy if exists "agent recruit updates visible by recruit access" on agent_recruit_updates;
+create policy "agent recruit updates visible by recruit access"
+on agent_recruit_updates for select
+using (
+  is_admin()
+  or author_profile_id = current_profile_id()
+  or exists (
+    select 1
+    from agent_recruits r
+    where r.id = agent_recruit_updates.recruit_id
+      and (
+        r.created_by = current_profile_id()
+        or r.assigned_recruiter_id = current_profile_id()
+        or exists (
+          select 1
+          from profiles p
+          where p.id = r.assigned_recruiter_id
+            and p.manager_id = current_profile_id()
+        )
+      )
+  )
+);
+
+drop policy if exists "agent recruit updates writable by recruit access" on agent_recruit_updates;
+create policy "agent recruit updates writable by recruit access"
+on agent_recruit_updates for all
+using (
+  is_admin()
+  or author_profile_id = current_profile_id()
+  or exists (
+    select 1
+    from agent_recruits r
+    where r.id = agent_recruit_updates.recruit_id
+      and (r.created_by = current_profile_id() or r.assigned_recruiter_id = current_profile_id())
+  )
+)
+with check (
+  is_admin()
+  or author_profile_id = current_profile_id()
+  or exists (
+    select 1
+    from agent_recruits r
+    where r.id = agent_recruit_updates.recruit_id
+      and (r.created_by = current_profile_id() or r.assigned_recruiter_id = current_profile_id())
+  )
+);
+
+drop policy if exists "agent onboarding visible by role" on agent_onboarding_records;
+create policy "agent onboarding visible by role"
+on agent_onboarding_records for select
+using (
+  is_admin()
+  or profile_id = current_profile_id()
+  or assigned_admin_id = current_profile_id()
+  or exists (
+    select 1
+    from profiles p
+    where p.id = agent_onboarding_records.profile_id
+      and p.manager_id = current_profile_id()
+  )
+);
+
+drop policy if exists "agent onboarding writable by reviewers" on agent_onboarding_records;
+create policy "agent onboarding writable by reviewers"
+on agent_onboarding_records for all
+using (
+  is_admin()
+  or assigned_admin_id = current_profile_id()
+  or profile_id = current_profile_id()
+)
+with check (
+  is_admin()
+  or assigned_admin_id = current_profile_id()
+  or profile_id = current_profile_id()
+);
+
+drop policy if exists "agent onboarding steps visible by record" on agent_onboarding_steps;
+create policy "agent onboarding steps visible by record"
+on agent_onboarding_steps for select
+using (
+  is_admin()
+  or exists (
+    select 1
+    from agent_onboarding_records r
+    where r.id = agent_onboarding_steps.onboarding_id
+      and (r.profile_id = current_profile_id() or r.assigned_admin_id = current_profile_id())
+  )
+);
+
+drop policy if exists "agent onboarding steps writable by record" on agent_onboarding_steps;
+create policy "agent onboarding steps writable by record"
+on agent_onboarding_steps for all
+using (
+  is_admin()
+  or exists (
+    select 1
+    from agent_onboarding_records r
+    where r.id = agent_onboarding_steps.onboarding_id
+      and (r.profile_id = current_profile_id() or r.assigned_admin_id = current_profile_id())
+  )
+)
+with check (
+  is_admin()
+  or exists (
+    select 1
+    from agent_onboarding_records r
+    where r.id = agent_onboarding_steps.onboarding_id
+      and (r.profile_id = current_profile_id() or r.assigned_admin_id = current_profile_id())
+  )
+);
+
+drop policy if exists "merchant onboarding visible by ownership" on merchant_onboarding_records;
+create policy "merchant onboarding visible by ownership"
+on merchant_onboarding_records for select
+using (
+  is_admin()
+  or assigned_agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents a
+    where a.id = merchant_onboarding_records.assigned_agent_id
+      and is_manager_for(a.profile_id)
+  )
+);
+
+drop policy if exists "merchant onboarding writable by ownership" on merchant_onboarding_records;
+create policy "merchant onboarding writable by ownership"
+on merchant_onboarding_records for all
+using (
+  is_admin()
+  or assigned_agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents a
+    where a.id = merchant_onboarding_records.assigned_agent_id
+      and is_manager_for(a.profile_id)
+  )
+)
+with check (
+  is_admin()
+  or assigned_agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents a
+    where a.id = merchant_onboarding_records.assigned_agent_id
+      and is_manager_for(a.profile_id)
+  )
+);
+
+drop policy if exists "merchant onboarding steps visible by record" on merchant_onboarding_steps;
+create policy "merchant onboarding steps visible by record"
+on merchant_onboarding_steps for select
+using (
+  is_admin()
+  or exists (
+    select 1
+    from merchant_onboarding_records r
+    where r.id = merchant_onboarding_steps.onboarding_id
+      and (
+        r.assigned_agent_id = current_agent_id()
+        or exists (
+          select 1
+          from agents a
+          where a.id = r.assigned_agent_id
+            and is_manager_for(a.profile_id)
+        )
+      )
+  )
+);
+
+drop policy if exists "merchant onboarding steps writable by record" on merchant_onboarding_steps;
+create policy "merchant onboarding steps writable by record"
+on merchant_onboarding_steps for all
+using (
+  is_admin()
+  or exists (
+    select 1
+    from merchant_onboarding_records r
+    where r.id = merchant_onboarding_steps.onboarding_id
+      and r.assigned_agent_id = current_agent_id()
+  )
+)
+with check (
+  is_admin()
+  or exists (
+    select 1
+    from merchant_onboarding_records r
+    where r.id = merchant_onboarding_steps.onboarding_id
+      and r.assigned_agent_id = current_agent_id()
+  )
+);
+
+drop policy if exists "signature requests visible by participant" on signature_requests;
+create policy "signature requests visible by participant"
+on signature_requests for select
+using (
+  is_admin()
+  or created_by = current_profile_id()
+  or recipient_profile_id = current_profile_id()
+  or (
+    related_entity_type = 'merchant'
+    and exists (
+      select 1
+      from merchants m
+      where m.id = signature_requests.related_entity_id
+        and (
+          m.assigned_agent_id = current_agent_id()
+          or exists (
+            select 1
+            from agents a
+            where a.id = m.assigned_agent_id
+              and is_manager_for(a.profile_id)
+          )
+        )
+    )
+  )
+);
+
+drop policy if exists "signature requests writable by participant" on signature_requests;
+create policy "signature requests writable by participant"
+on signature_requests for all
+using (
+  is_admin()
+  or created_by = current_profile_id()
+  or recipient_profile_id = current_profile_id()
+)
+with check (
+  is_admin()
+  or created_by = current_profile_id()
+  or recipient_profile_id = current_profile_id()
+);
 
 drop policy if exists "residuals visible by agent or manager" on residuals;
 create policy "residuals visible by agent or manager"

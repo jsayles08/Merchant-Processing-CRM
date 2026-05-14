@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { CrmAnalytics } from "@/components/analytics/crm-analytics";
 import { DashboardOverview } from "@/components/dashboard/dashboard-overview";
 import { getCrmPageContext } from "@/lib/page-context";
 
@@ -7,8 +8,9 @@ export default async function DashboardPage() {
 
   return (
     <AppShell profile={profile} title="Customer Information" eyebrow="MerchantDesk CRM" activeHref="/dashboard">
-      <div className="w-full">
+      <div className="w-full space-y-6">
         <DashboardOverview data={data} />
+        <CrmAnalytics data={data} compact />
       </div>
     </AppShell>
   );

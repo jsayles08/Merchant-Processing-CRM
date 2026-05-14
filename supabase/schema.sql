@@ -140,6 +140,145 @@ create table if not exists documents (
   created_at timestamptz not null default now()
 );
 
+create table if not exists agent_recruits (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  email text not null default '',
+  phone text,
+  source text,
+  status text not null default 'new_lead' check (status in (
+    'new_lead',
+    'contacted',
+    'interested',
+    'application_started',
+    'onboarding',
+    'active',
+    'rejected'
+  )),
+  assigned_recruiter_id uuid references profiles(id) on delete set null,
+  created_by uuid references profiles(id) on delete set null,
+  follow_up_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists agent_recruit_updates (
+  id uuid primary key default gen_random_uuid(),
+  recruit_id uuid not null references agent_recruits(id) on delete cascade,
+  author_profile_id uuid references profiles(id) on delete set null,
+  status text check (status in (
+    'new_lead',
+    'contacted',
+    'interested',
+    'application_started',
+    'onboarding',
+    'active',
+    'rejected'
+  )),
+  note text not null,
+  follow_up_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists agent_onboarding_records (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid references profiles(id) on delete set null,
+  recruit_id uuid references agent_recruits(id) on delete set null,
+  full_name text not null,
+  email text not null,
+  phone text,
+  assigned_admin_id uuid references profiles(id) on delete set null,
+  status text not null default 'invited' check (status in (
+    'invited',
+    'profile_incomplete',
+    'training',
+    'documents_pending',
+    'under_review',
+    'approved',
+    'active'
+  )),
+  profile_complete boolean not null default false,
+  training_progress integer not null default 0 check (training_progress between 0 and 100),
+  documents_signed boolean not null default false,
+  account_activated boolean not null default false,
+  admin_approved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists agent_onboarding_steps (
+  id uuid primary key default gen_random_uuid(),
+  onboarding_id uuid not null references agent_onboarding_records(id) on delete cascade,
+  title text not null,
+  description text,
+  step_order integer not null default 1,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (onboarding_id, step_order)
+);
+
+create table if not exists merchant_onboarding_records (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid references merchants(id) on delete set null,
+  business_name text not null,
+  contact_name text not null,
+  contact_email text,
+  contact_phone text,
+  industry text,
+  processing_needs text,
+  monthly_volume_estimate numeric(14,2) not null default 0,
+  average_ticket numeric(12,2) not null default 0,
+  current_processor text,
+  status text not null default 'lead' check (status in (
+    'lead',
+    'contacted',
+    'application_started',
+    'documents_needed',
+    'under_review',
+    'approved',
+    'active',
+    'declined'
+  )),
+  assigned_agent_id uuid references agents(id) on delete set null,
+  follow_up_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists merchant_onboarding_steps (
+  id uuid primary key default gen_random_uuid(),
+  onboarding_id uuid not null references merchant_onboarding_records(id) on delete cascade,
+  title text not null,
+  description text,
+  step_order integer not null default 1,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (onboarding_id, step_order)
+);
+
+create table if not exists signature_requests (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  recipient_name text not null,
+  recipient_email text not null,
+  recipient_profile_id uuid references profiles(id) on delete set null,
+  related_entity_type text not null check (related_entity_type in ('agent', 'recruit', 'merchant', 'account')),
+  related_entity_id uuid,
+  document_id uuid references documents(id) on delete set null,
+  provider text not null default 'manual',
+  provider_request_id text,
+  signing_url text,
+  status text not null default 'draft' check (status in ('draft', 'sent', 'viewed', 'signed', 'declined', 'expired')),
+  metadata jsonb not null default '{}'::jsonb,
+  created_by uuid references profiles(id) on delete set null,
+  sent_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists residuals (
   id uuid primary key default gen_random_uuid(),
   merchant_id uuid not null references merchants(id) on delete cascade,
@@ -274,6 +413,27 @@ create index if not exists audit_logs_entity_idx on audit_logs (entity_type, ent
 create index if not exists audit_logs_actor_idx on audit_logs (actor_profile_id, created_at desc);
 create index if not exists notification_deliveries_profile_idx on notification_deliveries (profile_id, created_at desc);
 create index if not exists residual_import_batches_created_idx on residual_import_batches (created_at desc);
+create index if not exists agent_recruits_status_idx on agent_recruits (status, updated_at desc);
+create index if not exists agent_recruits_recruiter_idx on agent_recruits (assigned_recruiter_id, follow_up_at);
+create index if not exists agent_recruit_updates_recruit_idx on agent_recruit_updates (recruit_id, created_at desc);
+create index if not exists agent_onboarding_records_status_idx on agent_onboarding_records (status, updated_at desc);
+create index if not exists agent_onboarding_steps_record_idx on agent_onboarding_steps (onboarding_id, step_order);
+create index if not exists merchant_onboarding_records_status_idx on merchant_onboarding_records (status, updated_at desc);
+create index if not exists merchant_onboarding_records_agent_idx on merchant_onboarding_records (assigned_agent_id, follow_up_at);
+create index if not exists merchant_onboarding_steps_record_idx on merchant_onboarding_steps (onboarding_id, step_order);
+create index if not exists signature_requests_status_idx on signature_requests (status, updated_at desc);
+create index if not exists signature_requests_entity_idx on signature_requests (related_entity_type, related_entity_id);
+create index if not exists signature_requests_recipient_idx on signature_requests (recipient_profile_id, created_at desc);
+
+grant select, insert, update, delete on
+  agent_recruits,
+  agent_recruit_updates,
+  agent_onboarding_records,
+  agent_onboarding_steps,
+  merchant_onboarding_records,
+  merchant_onboarding_steps,
+  signature_requests
+to authenticated;
 
 create or replace function set_updated_at()
 returns trigger
@@ -291,6 +451,22 @@ for each row execute function set_updated_at();
 
 drop trigger if exists deals_set_updated_at on deals;
 create trigger deals_set_updated_at before update on deals
+for each row execute function set_updated_at();
+
+drop trigger if exists agent_recruits_set_updated_at on agent_recruits;
+create trigger agent_recruits_set_updated_at before update on agent_recruits
+for each row execute function set_updated_at();
+
+drop trigger if exists agent_onboarding_records_set_updated_at on agent_onboarding_records;
+create trigger agent_onboarding_records_set_updated_at before update on agent_onboarding_records
+for each row execute function set_updated_at();
+
+drop trigger if exists merchant_onboarding_records_set_updated_at on merchant_onboarding_records;
+create trigger merchant_onboarding_records_set_updated_at before update on merchant_onboarding_records
+for each row execute function set_updated_at();
+
+drop trigger if exists signature_requests_set_updated_at on signature_requests;
+create trigger signature_requests_set_updated_at before update on signature_requests
 for each row execute function set_updated_at();
 
 create or replace function sync_deal_pricing_approval()
