@@ -12,6 +12,7 @@ import type {
   Deal,
   Document,
   DocumentStorageMigrationStatus,
+  EnterpriseSetting,
   Merchant,
   MerchantOnboardingRecord,
   MerchantOnboardingStep,
@@ -19,11 +20,13 @@ import type {
   Profile,
   Residual,
   ResidualImportBatch,
+  RolePermission,
   SignatureRequest,
   Task,
   Team,
   TeamMember,
 } from "@/lib/types";
+import { hydrateEnterpriseSettings, hydrateRolePermissions } from "@/lib/permissions";
 
 export type MerchantDetailData = {
   merchant: Merchant;
@@ -59,6 +62,8 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     teams,
     teamMembers,
     compensationRules,
+    rolePermissions,
+    enterpriseSettings,
     auditLogs,
   ] = await Promise.all([
     selectAll<Profile>(supabase, "profiles", "created_at"),
@@ -80,6 +85,8 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     selectAll<Team>(supabase, "teams", "created_at"),
     selectAll<TeamMember>(supabase, "team_members", "created_at"),
     selectAll<CompensationRule>(supabase, "compensation_rules", "created_at", false),
+    selectOptionalAll<RolePermission>(supabase, "role_permissions", "updated_at", false),
+    selectOptionalAll<EnterpriseSetting>(supabase, "enterprise_settings", "updated_at", false),
     selectOptionalAll<AuditLog>(supabase, "audit_logs", "created_at", false),
   ]);
 
@@ -103,6 +110,8 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     teams,
     teamMembers,
     compensationRule: compensationRules[0] ?? defaultRule,
+    rolePermissions: hydrateRolePermissions(rolePermissions),
+    enterpriseSettings: hydrateEnterpriseSettings(enterpriseSettings),
     auditLogs,
   };
 }

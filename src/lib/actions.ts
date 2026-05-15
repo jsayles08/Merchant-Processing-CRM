@@ -6,6 +6,7 @@ import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
 import { brand } from "@/lib/branding";
+import { enterpriseSettingDefaults, permissionCatalog } from "@/lib/permissions";
 import { normalizeImportMonth, parseProcessorResidualCsv } from "@/lib/residual-import";
 import { createSignatureProviderRequest } from "@/lib/signature-service";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -20,6 +21,8 @@ import type {
   MerchantOnboardingStatus,
   MerchantOnboardingStep,
   MerchantStatus,
+  Role,
+  RolePermission,
   SignatureEntityType,
   SignatureRequest,
   SignatureStatus,
@@ -193,6 +196,26 @@ const BulkAssignProfilesInput = z.object({
 const BulkReassignMerchantsInput = z.object({
   from_agent_id: z.string().uuid(),
   to_agent_id: z.string().uuid(),
+});
+
+const RolePermissionUpdateInput = z.object({
+  role: z.enum(["admin", "manager", "agent"]),
+  permissions: z.array(
+    z.object({
+      permission_key: z.string(),
+      enabled: z.boolean(),
+    }),
+  ),
+});
+
+const EnterpriseSettingsInput = z.object({
+  settings: z.array(
+    z.object({
+      setting_key: z.string(),
+      setting_value: z.record(z.string(), z.unknown()),
+      description: z.string().optional(),
+    }),
+  ),
 });
 
 const ResidualImportInput = z.object({
@@ -1250,6 +1273,115 @@ export async function bulkReassignMerchantsAction(input: unknown): Promise<Actio
   return { ok: true, message: `Reassigned ${merchantIds.length} merchants.` };
 }
 
+export async function updateRolePermissionsAction(input: unknown): Promise<ActionResult> {
+  const parsed = RolePermissionUpdateInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a role and valid permissions to update." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can change role access." };
+  }
+
+  const validKeys = new Set<string>(permissionCatalog.map((permission) => permission.key));
+  const criticalAdminKeys = new Set<string>(
+    permissionCatalog.filter((permission) => permission.critical).map((permission) => permission.key),
+  );
+  const adminOnlyKeys = new Set<string>(
+    permissionCatalog.filter((permission) => permission.adminOnly).map((permission) => permission.key),
+  );
+  const rows = parsed.data.permissions
+    .filter((permission) => validKeys.has(permission.permission_key))
+    .map((permission) => {
+      const enabled =
+        parsed.data.role === "admin" && criticalAdminKeys.has(permission.permission_key)
+          ? true
+          : parsed.data.role !== "admin" && adminOnlyKeys.has(permission.permission_key)
+            ? false
+            : permission.enabled;
+
+      return {
+        role: parsed.data.role as Role,
+        permission_key: permission.permission_key,
+        enabled,
+        updated_by: profile.id,
+        updated_at: new Date().toISOString(),
+      };
+    });
+
+  if (!rows.length) {
+    return { ok: false, message: "No supported permissions were selected." };
+  }
+
+  const { data, error } = await supabase
+    .from("role_permissions")
+    .upsert(rows, { onConflict: "role,permission_key" })
+    .select("*")
+    .returns<RolePermission[]>();
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "access.role_permissions_update",
+    entityType: "role_permission",
+    summary: `${profile.full_name} updated ${parsed.data.role} access permissions.`,
+    metadata: {
+      role: parsed.data.role,
+      changed_count: rows.length,
+      enabled_permissions: rows.filter((row) => row.enabled).map((row) => row.permission_key),
+    },
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  return { ok: true, message: `${parsed.data.role} access updated.`, data };
+}
+
+export async function updateEnterpriseSettingsAction(input: unknown): Promise<ActionResult> {
+  const parsed = EnterpriseSettingsInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose valid enterprise settings." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can change enterprise settings." };
+  }
+
+  const allowedSettings = new Map(enterpriseSettingDefaults.map((setting) => [setting.setting_key, setting]));
+  const rows = parsed.data.settings
+    .filter((setting) => allowedSettings.has(setting.setting_key))
+    .map((setting) => ({
+      setting_key: setting.setting_key,
+      setting_value: setting.setting_value,
+      description: setting.description || allowedSettings.get(setting.setting_key)?.description || null,
+      updated_by: profile.id,
+      updated_at: new Date().toISOString(),
+    }));
+
+  if (!rows.length) {
+    return { ok: false, message: "No supported enterprise settings were selected." };
+  }
+
+  const { data, error } = await supabase
+    .from("enterprise_settings")
+    .upsert(rows, { onConflict: "setting_key" })
+    .select("*");
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "settings.enterprise_policy_update",
+    entityType: "enterprise_setting",
+    summary: `${profile.full_name} updated enterprise policy settings.`,
+    metadata: { setting_keys: rows.map((row) => row.setting_key) },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true, message: "Enterprise policy settings saved.", data };
+}
+
 export async function importResidualReportAction(input: unknown): Promise<ActionResult> {
   const parsed = ResidualImportInput.safeParse(input);
   if (!parsed.success) {
@@ -1334,7 +1466,6 @@ export async function importResidualReportAction(input: unknown): Promise<Action
   }
 
   const status = errors.length ? (residualRows.length ? "completed" : "failed") : "completed";
-  await supabase
   if (batchId) {
     await supabase
       .from("residual_import_batches")

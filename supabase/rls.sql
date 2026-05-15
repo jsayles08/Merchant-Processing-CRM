@@ -17,6 +17,8 @@ alter table residual_import_batches enable row level security;
 alter table teams enable row level security;
 alter table team_members enable row level security;
 alter table compensation_rules enable row level security;
+alter table role_permissions enable row level security;
+alter table enterprise_settings enable row level security;
 alter table copilot_messages enable row level security;
 alter table copilot_actions enable row level security;
 alter table agent_performance_summaries enable row level security;
@@ -78,6 +80,23 @@ as $$
       and agent_profile.manager_id = current_profile_id()
   );
 $$;
+
+revoke execute on function current_profile_id() from public, anon;
+revoke execute on function current_agent_id() from public, anon;
+revoke execute on function current_app_role() from public, anon;
+revoke execute on function is_admin() from public, anon;
+revoke execute on function is_manager_for(uuid) from public, anon;
+
+grant execute on function current_profile_id() to authenticated;
+grant execute on function current_agent_id() to authenticated;
+grant execute on function current_app_role() to authenticated;
+grant execute on function is_admin() to authenticated;
+grant execute on function is_manager_for(uuid) to authenticated;
+grant execute on function current_profile_id() to service_role;
+grant execute on function current_agent_id() to service_role;
+grant execute on function current_app_role() to service_role;
+grant execute on function is_admin() to service_role;
+grant execute on function is_manager_for(uuid) to service_role;
 
 drop policy if exists "profiles visible by role" on profiles;
 create policy "profiles visible by role"
@@ -623,6 +642,28 @@ using (auth.uid() is not null);
 drop policy if exists "admin manages compensation rules" on compensation_rules;
 create policy "admin manages compensation rules"
 on compensation_rules for all
+using (is_admin())
+with check (is_admin());
+
+drop policy if exists "role permissions readable by authenticated" on role_permissions;
+create policy "role permissions readable by authenticated"
+on role_permissions for select
+using (auth.uid() is not null);
+
+drop policy if exists "admin manages role permissions" on role_permissions;
+create policy "admin manages role permissions"
+on role_permissions for all
+using (is_admin())
+with check (is_admin());
+
+drop policy if exists "enterprise settings readable by authenticated" on enterprise_settings;
+create policy "enterprise settings readable by authenticated"
+on enterprise_settings for select
+using (auth.uid() is not null);
+
+drop policy if exists "admin manages enterprise settings" on enterprise_settings;
+create policy "admin manages enterprise settings"
+on enterprise_settings for all
 using (is_admin())
 with check (is_admin());
 

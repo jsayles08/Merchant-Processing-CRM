@@ -4,7 +4,7 @@ import { getCrmPageContext } from "@/lib/page-context";
 import type { CopilotMessage } from "@/lib/types";
 
 export default async function MessagesPage() {
-  const { supabase, profile, data } = await getCrmPageContext();
+  const { supabase, profile, data } = await getCrmPageContext("messages.view");
   const { data: messages } = await supabase
     .from("copilot_messages")
     .select("*")
@@ -13,7 +13,7 @@ export default async function MessagesPage() {
     .returns<CopilotMessage[]>();
 
   return (
-    <AppShell profile={profile} title="Messages" eyebrow="Communication center" activeHref="/messages">
+    <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Messages" eyebrow="Communication center" activeHref="/messages">
       <div className="w-full">
         <MessageCenter messages={messages ?? []} merchants={data.merchants} />
       </div>

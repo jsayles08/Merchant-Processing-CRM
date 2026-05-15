@@ -4,10 +4,10 @@ import { DashboardOverview } from "@/components/dashboard/dashboard-overview";
 import { getCrmPageContext } from "@/lib/page-context";
 
 export default async function DashboardPage() {
-  const { profile, data } = await getCrmPageContext();
+  const { profile, data } = await getCrmPageContext("dashboard.view");
 
   return (
-    <AppShell profile={profile} title="Customer Information" eyebrow="MerchantDesk CRM" activeHref="/dashboard">
+    <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Customer Information" eyebrow="MerchantDesk CRM" activeHref="/dashboard">
       <div className="w-full space-y-6">
         <DashboardOverview data={data} />
         <CrmAnalytics data={data} compact />

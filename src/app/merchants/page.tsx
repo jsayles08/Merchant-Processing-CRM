@@ -7,11 +7,11 @@ export default async function MerchantsPage({
 }: {
   searchParams?: Promise<{ search?: string }>;
 }) {
-  const { profile, data, currentAgentId } = await getCrmPageContext();
+  const { profile, data, currentAgentId } = await getCrmPageContext("merchants.view");
   const params = await searchParams;
 
   return (
-    <AppShell profile={profile} title="Merchants" eyebrow="Sales workspace" activeHref="/merchants">
+    <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Merchants" eyebrow="Sales workspace" activeHref="/merchants">
       <div className="w-full">
         <MerchantManager
           data={data}

@@ -294,6 +294,24 @@ export type CompensationRule = {
   created_at: string;
 };
 
+export type RolePermission = {
+  id: string;
+  role: Role;
+  permission_key: string;
+  enabled: boolean;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EnterpriseSetting = {
+  setting_key: string;
+  setting_value: Record<string, unknown>;
+  description: string | null;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 export type CrmData = {
   profiles: Profile[];
   agents: Agent[];
@@ -314,6 +332,8 @@ export type CrmData = {
   teams: Team[];
   teamMembers: TeamMember[];
   compensationRule: CompensationRule;
+  rolePermissions: RolePermission[];
+  enterpriseSettings: EnterpriseSetting[];
   auditLogs: AuditLog[];
 };
 

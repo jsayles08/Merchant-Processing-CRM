@@ -7,7 +7,7 @@ export default async function CopilotPage({
 }: {
   searchParams?: Promise<{ merchant?: string }>;
 }) {
-  const { supabase, profile, data } = await getCrmPageContext();
+  const { supabase, profile, data } = await getCrmPageContext("copilot.use");
   const params = await searchParams;
   const { data: copilotMessages } = await supabase
     .from("copilot_messages")
@@ -16,7 +16,7 @@ export default async function CopilotPage({
     .limit(20);
 
   return (
-    <AppShell profile={profile} title="Agent Copilot" eyebrow="AI assistant" activeHref="/copilot">
+    <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Agent Copilot" eyebrow="AI assistant" activeHref="/copilot">
       <div className="w-full">
         <CopilotPanel
           initialMessages={copilotMessages ?? []}

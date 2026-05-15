@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 
 const searchEventName = "crm:global-search";
 
-export function HeaderActions() {
+export function HeaderActions({
+  canUseCopilot = true,
+  canCreateMerchants = true,
+  canViewMerchants = true,
+}: {
+  canUseCopilot?: boolean;
+  canCreateMerchants?: boolean;
+  canViewMerchants?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const router = useRouter();
 
@@ -17,11 +25,13 @@ export function HeaderActions() {
   }
 
   function openMerchantSearch() {
+    if (!canViewMerchants) return;
     router.push(query.trim() ? `/merchants?search=${encodeURIComponent(query.trim())}` : "/merchants");
   }
 
   return (
     <>
+      {canViewMerchants ? (
       <label className="relative hidden 2xl:block 2xl:w-72">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#25425E]/55" />
         <input
@@ -36,14 +46,19 @@ export function HeaderActions() {
           }}
         />
       </label>
-      <Button className="whitespace-nowrap rounded-full" variant="secondary" type="button" onClick={() => router.push("/copilot")}>
-        <Bot className="h-4 w-4" />
-        Ask Copilot
-      </Button>
-      <Button className="whitespace-nowrap rounded-full" type="button" onClick={() => router.push("/merchants#add-merchant")}>
-        <Plus className="h-4 w-4" />
-        Add Merchant
-      </Button>
+      ) : null}
+      {canUseCopilot ? (
+        <Button className="whitespace-nowrap rounded-full" variant="secondary" type="button" onClick={() => router.push("/copilot")}>
+          <Bot className="h-4 w-4" />
+          Ask Copilot
+        </Button>
+      ) : null}
+      {canCreateMerchants ? (
+        <Button className="whitespace-nowrap rounded-full" type="button" onClick={() => router.push("/merchants#add-merchant")}>
+          <Plus className="h-4 w-4" />
+          Add Merchant
+        </Button>
+      ) : null}
     </>
   );
 }

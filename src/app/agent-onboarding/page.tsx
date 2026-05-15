@@ -3,10 +3,10 @@ import { AgentOnboardingWorkspace } from "@/components/onboarding/agent-onboardi
 import { getCrmPageContext } from "@/lib/page-context";
 
 export default async function AgentOnboardingPage() {
-  const { profile, data } = await getCrmPageContext();
+  const { profile, data } = await getCrmPageContext("agent_onboarding.view");
 
   return (
-    <AppShell profile={profile} title="Agent Onboarding" eyebrow="Activation workflow" activeHref="/agent-onboarding">
+    <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Agent Onboarding" eyebrow="Activation workflow" activeHref="/agent-onboarding">
       <AgentOnboardingWorkspace data={data} />
     </AppShell>
   );

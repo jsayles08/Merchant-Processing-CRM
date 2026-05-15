@@ -336,6 +336,25 @@ create table if not exists compensation_rules (
   created_at timestamptz not null default now()
 );
 
+create table if not exists role_permissions (
+  id uuid primary key default gen_random_uuid(),
+  role app_role not null,
+  permission_key text not null,
+  enabled boolean not null default false,
+  updated_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (role, permission_key)
+);
+
+create table if not exists enterprise_settings (
+  setting_key text primary key,
+  setting_value jsonb not null default '{}'::jsonb,
+  description text,
+  updated_by uuid references profiles(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists copilot_messages (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -424,6 +443,8 @@ create index if not exists merchant_onboarding_steps_record_idx on merchant_onbo
 create index if not exists signature_requests_status_idx on signature_requests (status, updated_at desc);
 create index if not exists signature_requests_entity_idx on signature_requests (related_entity_type, related_entity_id);
 create index if not exists signature_requests_recipient_idx on signature_requests (recipient_profile_id, created_at desc);
+create index if not exists role_permissions_role_idx on role_permissions (role, permission_key);
+create index if not exists enterprise_settings_updated_idx on enterprise_settings (updated_at desc);
 
 grant select, insert, update, delete on
   agent_recruits,
@@ -435,9 +456,15 @@ grant select, insert, update, delete on
   signature_requests
 to authenticated;
 
+grant select, insert, update, delete on
+  role_permissions,
+  enterprise_settings
+to authenticated;
+
 create or replace function set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -469,9 +496,18 @@ drop trigger if exists signature_requests_set_updated_at on signature_requests;
 create trigger signature_requests_set_updated_at before update on signature_requests
 for each row execute function set_updated_at();
 
+drop trigger if exists role_permissions_set_updated_at on role_permissions;
+create trigger role_permissions_set_updated_at before update on role_permissions
+for each row execute function set_updated_at();
+
+drop trigger if exists enterprise_settings_set_updated_at on enterprise_settings;
+create trigger enterprise_settings_set_updated_at before update on enterprise_settings
+for each row execute function set_updated_at();
+
 create or replace function sync_deal_pricing_approval()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare
   minimum_rate numeric(5,2);
@@ -501,6 +537,7 @@ for each row execute function sync_deal_pricing_approval();
 create or replace function create_follow_up_task_from_update()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare
   assignee_profile uuid;
@@ -526,6 +563,7 @@ create or replace function agent_has_active_recruit_status(recruit_agent_id uuid
 returns boolean
 language sql
 stable
+set search_path = public
 as $$
   with rule as (
     select active_recruit_required_merchants, active_recruit_required_processing_days
@@ -543,6 +581,7 @@ $$;
 create or replace function refresh_team_member_active_status()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   update team_members
@@ -563,13 +602,15 @@ drop trigger if exists merchants_refresh_team_status on merchants;
 create trigger merchants_refresh_team_status after insert or update of is_verified, processing_start_date, assigned_agent_id on merchants
 for each row execute function refresh_team_member_active_status();
 
-create or replace view stale_leads as
+create or replace view stale_leads
+with (security_invoker = true) as
 select *
 from merchants
 where status not in ('processing', 'lost', 'inactive')
   and updated_at < now() - interval '7 days';
 
-create or replace view agent_monthly_income as
+create or replace view agent_monthly_income
+with (security_invoker = true) as
 select
   a.id as agent_id,
   date_trunc('month', r.month)::date as month,
@@ -579,7 +620,8 @@ from agents a
 left join residuals r on r.agent_id = a.id
 group by a.id, date_trunc('month', r.month);
 
-create or replace view document_storage_migration_status as
+create or replace view document_storage_migration_status
+with (security_invoker = true) as
 select
   count(*)::integer as total_documents,
   count(*) filter (where file_url ilike 'http%' or file_url like '/%')::integer as public_url_documents,
@@ -646,6 +688,9 @@ begin
 end;
 $$;
 
+revoke execute on function create_weekly_agent_performance_summaries(date) from public, anon, authenticated;
+grant execute on function create_weekly_agent_performance_summaries(date) to service_role;
+
 insert into storage.buckets (id, name, public)
 values ('merchant-documents', 'merchant-documents', false)
 on conflict (id) do nothing;
@@ -657,3 +702,13 @@ where id = 'merchant-documents';
 insert into compensation_rules (rule_name)
 values ('MerchantDesk Standard Agent Plan')
 on conflict (rule_name) do nothing;
+
+insert into enterprise_settings (setting_key, setting_value, description)
+values
+  ('require_mfa_for_admins', '{"enabled":true}'::jsonb, 'Require higher-privilege users to use MFA before production rollout.'),
+  ('restrict_exports_to_leadership', '{"enabled":true}'::jsonb, 'Keep book exports limited to manager and admin roles.'),
+  ('audit_sensitive_actions', '{"enabled":true}'::jsonb, 'Record sensitive changes for compliance review and dispute resolution.'),
+  ('api_access_enabled', '{"enabled":false}'::jsonb, 'Controls whether external API integrations should be allowed.'),
+  ('session_timeout_minutes', '{"minutes":60}'::jsonb, 'Target idle session timeout used for enterprise security policy.'),
+  ('data_retention_years', '{"years":7}'::jsonb, 'Default business data retention window for operations and backup policies.')
+on conflict (setting_key) do nothing;

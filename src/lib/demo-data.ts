@@ -1,5 +1,6 @@
 import type { CrmData, MerchantStatus } from "@/lib/types";
 import { calculatePersonalResidual, requiresManagementApproval } from "@/lib/compensation";
+import { defaultRolePermissions, enterpriseSettingDefaults } from "@/lib/permissions";
 
 const now = "2026-05-06T12:00:00.000Z";
 
@@ -541,6 +542,8 @@ export const demoData: CrmData = {
     active_recruit_required_processing_days: 90,
     created_at: now,
   },
+  rolePermissions: defaultRolePermissions(),
+  enterpriseSettings: enterpriseSettingDefaults,
 };
 
 demoData.deals = demoData.merchants.map((merchant) => {

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarClock, FileUp, Mail, Phone, ReceiptText } from "lucide-react";
 import { createMerchantUpdateAction, uploadMerchantDocumentAction } from "@/lib/actions";
-import { getSessionContext } from "@/lib/auth";
 import { getMerchantDetailData } from "@/lib/data";
+import { getCrmPageContext } from "@/lib/page-context";
 import { AppShell } from "@/components/app-shell";
 import { DeleteMerchantButton } from "@/components/merchants/delete-merchant-button";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ export default async function MerchantProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { supabase, profile } = await getSessionContext();
+  const { supabase, profile, data } = await getCrmPageContext("merchants.view");
   const detail = await getMerchantDetailData(supabase, id);
 
   if (!detail) notFound();
@@ -37,7 +37,7 @@ export default async function MerchantProfilePage({
   }
 
   return (
-    <AppShell profile={profile} title={detail.merchant.business_name} eyebrow="Merchant profile" activeHref="/merchants">
+    <AppShell profile={profile} rolePermissions={data.rolePermissions} title={detail.merchant.business_name} eyebrow="Merchant profile" activeHref="/merchants">
       <div className="w-full space-y-6">
         <Link href="/merchants" className="inline-flex items-center gap-2 rounded-full border border-[#ABB7C0]/25 bg-white/70 px-4 py-2 text-sm font-semibold text-[#0B0F15] transition hover:bg-white">
           <ArrowLeft className="h-4 w-4" />

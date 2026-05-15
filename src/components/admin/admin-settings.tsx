@@ -2,9 +2,34 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightLeft, KeyRound, Sparkles, UserPlus, UsersRound } from "lucide-react";
-import { bulkAssignProfilesToManagerAction, bulkReassignMerchantsAction, createTeamMemberAction } from "@/lib/actions";
-import type { CrmData, Profile, Role } from "@/lib/types";
+import {
+  ArrowRightLeft,
+  CheckCircle2,
+  DatabaseBackup,
+  KeyRound,
+  LockKeyhole,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  UsersRound,
+} from "lucide-react";
+import {
+  bulkAssignProfilesToManagerAction,
+  bulkReassignMerchantsAction,
+  createTeamMemberAction,
+  updateEnterpriseSettingsAction,
+  updateRolePermissionsAction,
+} from "@/lib/actions";
+import {
+  enterpriseSettingDefaults,
+  hydrateEnterpriseSettings,
+  hydrateRolePermissions,
+  permissionCatalog,
+  permissionCategories,
+  type PermissionKey,
+} from "@/lib/permissions";
+import type { CrmData, EnterpriseSetting, Profile, Role, RolePermission } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +46,11 @@ type UserForm = {
   temp_password: string;
 };
 
+type PermissionDraft = Record<Role, Record<PermissionKey, boolean>>;
+type EnterpriseDraft = Record<string, Record<string, unknown>>;
+
+const editableRoles: Role[] = ["agent", "manager", "admin"];
+
 export function AdminSettings({ data, currentProfile }: { data: CrmData; currentProfile: Profile }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -29,6 +59,8 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
   const [selectedManagerId, setSelectedManagerId] = useState("");
   const [fromAgentId, setFromAgentId] = useState("");
   const [toAgentId, setToAgentId] = useState("");
+  const [permissionDraft, setPermissionDraft] = useState<PermissionDraft>(() => buildPermissionDraft(data.rolePermissions));
+  const [enterpriseDraft, setEnterpriseDraft] = useState<EnterpriseDraft>(() => buildEnterpriseDraft(data.enterpriseSettings));
   const [form, setForm] = useState<UserForm>({
     full_name: "",
     email: "",
@@ -42,6 +74,12 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
 
   const managers = data.profiles.filter((profile) => profile.role === "manager" || profile.role === "admin");
   const assignableProfiles = data.profiles.filter((profile) => profile.role !== "admin");
+  const hydratedPermissions = useMemo(() => hydrateRolePermissions(data.rolePermissions), [data.rolePermissions]);
+  const hydratedEnterpriseSettings = useMemo(() => hydrateEnterpriseSettings(data.enterpriseSettings), [data.enterpriseSettings]);
+  const enabledPermissionCounts = editableRoles.map((role) => ({
+    role,
+    count: permissionCatalog.filter((permission) => permissionDraft[role]?.[permission.key]).length,
+  }));
   const sponsors = useMemo(
     () =>
       data.agents.map((agent) => {
@@ -134,12 +172,255 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
     });
   }
 
+  function togglePermission(role: Role, permissionKey: PermissionKey) {
+    const permission = permissionCatalog.find((item) => item.key === permissionKey);
+    if (role === "admin" && permission?.critical) {
+      setMessage("Admin dashboard and access-control permissions stay enabled to prevent lockout.");
+      return;
+    }
+    if (role !== "admin" && permission?.adminOnly) {
+      setMessage("This permission is admin-only for enterprise security.");
+      return;
+    }
+
+    setPermissionDraft((current) => ({
+      ...current,
+      [role]: {
+        ...current[role],
+        [permissionKey]: !current[role][permissionKey],
+      },
+    }));
+  }
+
+  function saveRolePermissions(role: Role) {
+    startTransition(async () => {
+      const result = await updateRolePermissionsAction({
+        role,
+        permissions: permissionCatalog.map((permission) => ({
+          permission_key: permission.key,
+          enabled: permissionDraft[role][permission.key],
+        })),
+      });
+      setMessage(result.message);
+      if (result.ok) router.refresh();
+    });
+  }
+
+  function saveAllRolePermissions() {
+    startTransition(async () => {
+      for (const role of editableRoles) {
+        const result = await updateRolePermissionsAction({
+          role,
+          permissions: permissionCatalog.map((permission) => ({
+            permission_key: permission.key,
+            enabled: permissionDraft[role][permission.key],
+          })),
+        });
+        if (!result.ok) {
+          setMessage(result.message);
+          return;
+        }
+      }
+      setMessage("All role access settings were saved.");
+      router.refresh();
+    });
+  }
+
+  function updateEnterpriseSetting(settingKey: string, field: string, value: unknown) {
+    setEnterpriseDraft((current) => ({
+      ...current,
+      [settingKey]: {
+        ...(current[settingKey] ?? {}),
+        [field]: value,
+      },
+    }));
+  }
+
+  function saveEnterpriseSettings() {
+    startTransition(async () => {
+      const result = await updateEnterpriseSettingsAction({
+        settings: enterpriseSettingDefaults.map((setting) => ({
+          setting_key: setting.setting_key,
+          setting_value: enterpriseDraft[setting.setting_key] ?? setting.setting_value,
+          description: setting.description ?? undefined,
+        })),
+      });
+      setMessage(result.message);
+      if (result.ok) router.refresh();
+    });
+  }
+
   if (currentProfile.role !== "admin") {
     return null;
   }
 
   return (
     <section id="admin-settings" className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
+      <Card className="xl:col-span-2">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Enterprise Access Control</CardTitle>
+              <CardDescription>Configure exactly what agents, managers, and admins can see or operate.</CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {enabledPermissionCounts.map((item) => (
+                <Badge key={item.role} tone={item.role === "admin" ? "amber" : item.role === "manager" ? "blue" : "slate"}>
+                  {item.role}: {item.count}
+                </Badge>
+              ))}
+              <Button type="button" onClick={saveAllRolePermissions} disabled={isPending}>
+                <Save className="h-4 w-4" />
+                Save All Access
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {permissionCategories.map((category) => (
+            <div key={category} className="crm-panel overflow-hidden rounded-[24px]">
+              <div className="flex items-center justify-between border-b border-[#ABB7C0]/25 bg-white/55 px-4 py-3">
+                <p className="text-sm font-black uppercase tracking-wide text-[#25425E]">{category}</p>
+                <div className="hidden grid-cols-3 gap-3 text-center text-xs font-black uppercase text-[#25425E]/70 sm:grid sm:w-72">
+                  <span>Agent</span>
+                  <span>Manager</span>
+                  <span>Admin</span>
+                </div>
+              </div>
+              <div className="divide-y divide-[#ABB7C0]/20">
+                {permissionCatalog
+                  .filter((permission) => permission.category === category)
+                  .map((permission) => (
+                    <div key={permission.key} className="grid gap-3 px-4 py-3 sm:grid-cols-[1fr_18rem] sm:items-center">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-[#0B0F15]">{permission.label}</p>
+                          {permission.critical ? <Badge tone="amber">Protected</Badge> : null}
+                          {permission.adminOnly ? <Badge tone="slate">Admin only</Badge> : null}
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-[#25425E]/70">{permission.description}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {editableRoles.map((role) => {
+                          const locked = (role === "admin" && Boolean(permission.critical)) || (role !== "admin" && Boolean(permission.adminOnly));
+                          const checked = Boolean(permissionDraft[role]?.[permission.key]);
+                          return (
+                            <label
+                              key={`${role}-${permission.key}`}
+                              className={`flex h-11 items-center justify-center rounded-full border text-sm font-semibold transition ${
+                                checked
+                                  ? "border-[#0E5EC9]/25 bg-[#0E5EC9]/10 text-[#0E5EC9]"
+                                  : "border-[#ABB7C0]/30 bg-white/60 text-[#25425E]/65"
+                              } ${locked ? "cursor-not-allowed opacity-75" : "cursor-pointer hover:bg-white"}`}
+                              title={permission.adminOnly && role !== "admin" ? "Admin-only permission" : locked ? "Protected for admins" : `${role} access`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={checked}
+                                disabled={locked}
+                                onChange={() => togglePermission(role, permission.key)}
+                              />
+                              {checked ? <CheckCircle2 className="h-4 w-4" /> : <span className="h-4 w-4 rounded-full border border-current" />}
+                              <span className="ml-2 capitalize sm:hidden">{role}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ))}
+          <div className="grid gap-3 md:grid-cols-3">
+            {editableRoles.map((role) => (
+              <Button key={role} variant="secondary" type="button" onClick={() => saveRolePermissions(role)} disabled={isPending}>
+                <ShieldCheck className="h-4 w-4" />
+                Save {role}
+              </Button>
+            ))}
+          </div>
+          <div className="crm-panel rounded-[24px] p-4 text-sm leading-6 text-[#25425E]">
+            <LockKeyhole className="mr-2 inline h-4 w-4 text-[#0E5EC9]" />
+            Navigation and direct page access use these settings. Sensitive server-side actions still check role and RLS rules.
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="xl:col-span-2">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Enterprise Policy Controls</CardTitle>
+              <CardDescription>Operational controls that prepare MerchantDesk for larger teams, audits, and integrations.</CardDescription>
+            </div>
+            <Button type="button" onClick={saveEnterpriseSettings} disabled={isPending}>
+              <Save className="h-4 w-4" />
+              Save Policies
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-3 md:grid-cols-2">
+            <EnterpriseToggle
+              label="Require MFA for admins/managers"
+              description={settingDescription(hydratedEnterpriseSettings, "require_mfa_for_admins")}
+              checked={Boolean(enterpriseDraft.require_mfa_for_admins?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("require_mfa_for_admins", "enabled", checked)}
+            />
+            <EnterpriseToggle
+              label="Restrict exports to leadership"
+              description={settingDescription(hydratedEnterpriseSettings, "restrict_exports_to_leadership")}
+              checked={Boolean(enterpriseDraft.restrict_exports_to_leadership?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("restrict_exports_to_leadership", "enabled", checked)}
+            />
+            <EnterpriseToggle
+              label="Audit sensitive actions"
+              description={settingDescription(hydratedEnterpriseSettings, "audit_sensitive_actions")}
+              checked={Boolean(enterpriseDraft.audit_sensitive_actions?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("audit_sensitive_actions", "enabled", checked)}
+            />
+            <EnterpriseToggle
+              label="Enable external API access"
+              description={settingDescription(hydratedEnterpriseSettings, "api_access_enabled")}
+              checked={Boolean(enterpriseDraft.api_access_enabled?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("api_access_enabled", "enabled", checked)}
+            />
+            <Field label="Session timeout target">
+              <Input
+                type="number"
+                min="15"
+                max="720"
+                value={String(enterpriseDraft.session_timeout_minutes?.minutes ?? 60)}
+                onChange={(event) => updateEnterpriseSetting("session_timeout_minutes", "minutes", Number(event.target.value) || 60)}
+              />
+            </Field>
+            <Field label="Data retention target">
+              <Input
+                type="number"
+                min="1"
+                max="10"
+                value={String(enterpriseDraft.data_retention_years?.years ?? 7)}
+                onChange={(event) => updateEnterpriseSetting("data_retention_years", "years", Number(event.target.value) || 7)}
+              />
+            </Field>
+          </div>
+
+          <div className="space-y-3">
+            <EnterpriseStat icon={<UsersRound className="h-4 w-4" />} label="Active users" value={data.profiles.filter((profile) => profile.status === "active").length.toString()} />
+            <EnterpriseStat icon={<ShieldCheck className="h-4 w-4" />} label="Permission records" value={hydratedPermissions.length.toString()} />
+            <EnterpriseStat icon={<DatabaseBackup className="h-4 w-4" />} label="Audit events" value={data.auditLogs.length.toString()} />
+            <EnterpriseStat icon={<KeyRound className="h-4 w-4" />} label="API policy" value={enterpriseDraft.api_access_enabled?.enabled ? "Enabled" : "Disabled"} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {message ? (
+        <div className="crm-panel xl:col-span-2 rounded-[24px] border-[#0E5EC9]/20 bg-[#0E5EC9]/10 p-4 text-sm font-semibold text-[#25425E]">
+          {message}
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Create User / Agent</CardTitle>
@@ -205,7 +486,6 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
               </div>
             </Field>
           </div>
-          {message ? <p className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">{message}</p> : null}
           <Button className="w-full" onClick={createUser} disabled={isPending}>
             <UserPlus className="h-4 w-4" />
             Create User
@@ -324,6 +604,70 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1.5">
       <Label>{label}</Label>
       {children}
+    </div>
+  );
+}
+
+function buildPermissionDraft(rows: RolePermission[]): PermissionDraft {
+  const hydratedRows = hydrateRolePermissions(rows);
+  const draft = {} as PermissionDraft;
+
+  for (const role of editableRoles) {
+    draft[role] = {} as Record<PermissionKey, boolean>;
+    for (const permission of permissionCatalog) {
+      draft[role][permission.key] =
+        hydratedRows.find((row) => row.role === role && row.permission_key === permission.key)?.enabled ?? false;
+    }
+  }
+
+  return draft;
+}
+
+function buildEnterpriseDraft(rows: EnterpriseSetting[]): EnterpriseDraft {
+  return Object.fromEntries(hydrateEnterpriseSettings(rows).map((setting) => [setting.setting_key, setting.setting_value])) as EnterpriseDraft;
+}
+
+function settingDescription(settings: EnterpriseSetting[], settingKey: string) {
+  return settings.find((setting) => setting.setting_key === settingKey)?.description ?? "";
+}
+
+function EnterpriseToggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="crm-panel flex cursor-pointer items-start justify-between gap-4 rounded-[24px] p-4 transition hover:-translate-y-0.5 hover:bg-white/70">
+      <span>
+        <span className="block font-semibold text-[#0B0F15]">{label}</span>
+        <span className="mt-1 block text-sm leading-6 text-[#25425E]/70">{description}</span>
+      </span>
+      <span className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition ${checked ? "bg-[#0E5EC9]" : "bg-[#ABB7C0]/45"}`}>
+        <input type="checkbox" className="sr-only" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${
+            checked ? "left-6" : "left-1"
+          }`}
+        />
+      </span>
+    </label>
+  );
+}
+
+function EnterpriseStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="crm-panel flex items-center justify-between gap-4 rounded-[24px] p-4">
+      <div className="flex items-center gap-3">
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#0E5EC9] shadow-sm">{icon}</span>
+        <span className="text-sm font-semibold text-[#25425E]/70">{label}</span>
+      </div>
+      <span className="text-lg font-black text-[#0B0F15]">{value}</span>
     </div>
   );
 }

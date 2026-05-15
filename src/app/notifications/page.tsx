@@ -4,7 +4,7 @@ import { getCrmPageContext } from "@/lib/page-context";
 import type { Notification, NotificationDelivery } from "@/lib/types";
 
 export default async function NotificationsPage() {
-  const { supabase, profile, data } = await getCrmPageContext();
+  const { supabase, profile, data } = await getCrmPageContext("notifications.view");
   const [{ data: notifications }, { data: deliveries }] = await Promise.all([
     supabase
       .from("notifications")
@@ -23,7 +23,7 @@ export default async function NotificationsPage() {
   ]);
 
   return (
-    <AppShell profile={profile} title="Notifications" eyebrow="Alert center" activeHref="/notifications">
+    <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Notifications" eyebrow="Alert center" activeHref="/notifications">
       <div className="w-full">
         <NotificationCenter
           initialNotifications={notifications ?? []}

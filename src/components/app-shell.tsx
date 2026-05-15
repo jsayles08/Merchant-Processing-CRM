@@ -25,12 +25,14 @@ import { signOutAction } from "@/app/login/actions";
 import { BrandLogo } from "@/components/brand-logo";
 import { HeaderActions } from "@/components/header-actions";
 import { brand } from "@/lib/branding";
-import type { Profile } from "@/lib/types";
+import { hasPermission, permissionForHref, type PermissionKey } from "@/lib/permissions";
+import type { Profile, RolePermission } from "@/lib/types";
 
 type NavItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   href: string;
+  permissionKey?: PermissionKey;
 };
 
 const topNavItems: NavItem[] = [
@@ -51,7 +53,7 @@ const railItems: NavItem[] = [
   { label: "Opportunities", icon: Share2, href: "/opportunities" },
   { label: "Documents", icon: Upload, href: "/documents" },
   { label: "Analytics", icon: BarChart3, href: "/analytics" },
-  { label: "Add merchant", icon: Plus, href: "/merchants#add-merchant" },
+  { label: "Add merchant", icon: Plus, href: "/merchants#add-merchant", permissionKey: "merchants.create" },
   { label: "Compensation", icon: HandCoins, href: "/compensation" },
   { label: "Data room", icon: Database, href: "/documents" },
   { label: "Tasks", icon: CalendarDays, href: "/tasks" },
@@ -65,16 +67,31 @@ const headerIconClassName =
 export function AppShell({
   children,
   profile,
+  rolePermissions = [],
   title = "Dashboard",
   eyebrow = "MerchantDesk",
   activeHref = "/dashboard",
 }: {
   children: React.ReactNode;
   profile?: Profile;
+  rolePermissions?: RolePermission[];
   title?: string;
   eyebrow?: string;
   activeHref?: string;
 }) {
+  const canAccess = (item: NavItem) => {
+    if (!profile) return true;
+    const permissionKey = item.permissionKey ?? permissionForHref(item.href.split("#")[0]);
+    return permissionKey ? hasPermission(profile.role, rolePermissions, permissionKey) : true;
+  };
+  const visibleTopNavItems = topNavItems.filter((item) => canAccess(item));
+  const visibleRailItems = railItems.filter((item) => canAccess(item));
+  const canViewMessages = profile ? hasPermission(profile.role, rolePermissions, "messages.view") : true;
+  const canViewNotifications = profile ? hasPermission(profile.role, rolePermissions, "notifications.view") : true;
+  const canUseCopilot = profile ? hasPermission(profile.role, rolePermissions, "copilot.use") : true;
+  const canCreateMerchants = profile ? hasPermission(profile.role, rolePermissions, "merchants.create") : true;
+  const canViewMerchants = profile ? hasPermission(profile.role, rolePermissions, "merchants.view") : true;
+
   return (
     <div className="crm-shell-bg min-h-screen text-[#0B0F15]">
       <div className="min-h-screen w-full overflow-hidden">
@@ -86,7 +103,7 @@ export function AppShell({
               </Link>
 
               <nav className="hidden items-center gap-3 xl:flex">
-                {topNavItems.map((item) => {
+                {visibleTopNavItems.map((item) => {
                   const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
                   return (
                     <Link
@@ -106,14 +123,22 @@ export function AppShell({
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <HeaderActions />
+              <HeaderActions
+                canUseCopilot={canUseCopilot}
+                canCreateMerchants={canCreateMerchants}
+                canViewMerchants={canViewMerchants}
+              />
               <div className="flex items-center gap-2">
-                <Link href="/messages" aria-label="Messages" title="Messages" className={headerIconClassName}>
-                  <Mail className="h-4 w-4" />
-                </Link>
-                <Link href="/notifications" aria-label="Notifications" title="Notifications" className={headerIconClassName}>
-                  <Bell className="h-4 w-4" />
-                </Link>
+                {canViewMessages ? (
+                  <Link href="/messages" aria-label="Messages" title="Messages" className={headerIconClassName}>
+                    <Mail className="h-4 w-4" />
+                  </Link>
+                ) : null}
+                {canViewNotifications ? (
+                  <Link href="/notifications" aria-label="Notifications" title="Notifications" className={headerIconClassName}>
+                    <Bell className="h-4 w-4" />
+                  </Link>
+                ) : null}
                 {profile ? (
                   <div className="flex items-center gap-2 rounded-full bg-white/45 p-1.5 shadow-inner ring-1 ring-black/5">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#E9D7A1] text-sm font-black text-[#0B0F15]">
@@ -140,7 +165,7 @@ export function AppShell({
               <h1 className="text-2xl font-black text-[#0B0F15]">{title}</h1>
             </div>
             <nav className="flex gap-2 overflow-x-auto pb-1">
-              {topNavItems.map((item) => {
+              {visibleTopNavItems.map((item) => {
                 const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
                 const Icon = item.icon;
                 return (
@@ -162,7 +187,7 @@ export function AppShell({
 
         <div className="relative">
           <aside className="fixed left-5 top-[8.5rem] z-20 hidden max-h-[calc(100vh-10rem)] overflow-visible rounded-full bg-[#0B0F15]/95 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:items-start xl:gap-2">
-            {railItems.map((item) => {
+            {visibleRailItems.map((item) => {
               const Icon = item.icon;
               const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
               return (
