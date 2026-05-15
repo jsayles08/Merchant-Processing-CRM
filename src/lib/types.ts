@@ -312,6 +312,21 @@ export type EnterpriseSetting = {
   updated_at: string;
 };
 
+export type CopilotMemory = {
+  id: string;
+  scope: "company" | "merchant" | "agent" | "user";
+  title: string;
+  content: string;
+  entity_id: string | null;
+  confidence: number;
+  source_type: string;
+  source_id: string | null;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CrmData = {
   profiles: Profile[];
   agents: Agent[];
@@ -334,6 +349,7 @@ export type CrmData = {
   compensationRule: CompensationRule;
   rolePermissions: RolePermission[];
   enterpriseSettings: EnterpriseSetting[];
+  copilotMemories: CopilotMemory[];
   auditLogs: AuditLog[];
 };
 

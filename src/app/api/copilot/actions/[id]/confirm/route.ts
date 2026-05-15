@@ -162,16 +162,127 @@ export async function POST(
   if (action.action_type === "create_task") {
     const task = await supabase.from("tasks").insert({
       title: typeof payload.title === "string" ? payload.title : action.action_summary,
-      description: action.action_summary,
+      description: typeof payload.description === "string" ? payload.description : action.action_summary,
       assigned_to: profile.id,
       merchant_id: merchantId,
-      due_date: new Date(Date.now() + 86_400_000).toISOString(),
+      due_date: parseDueDate(payload.due_date) ?? new Date(Date.now() + 86_400_000).toISOString(),
       priority: isPriority(payload.priority) ? payload.priority : "medium",
       status: "open",
     });
 
     if (task.error) throw task.error;
     completionMessage = "Task created.";
+    completed = true;
+  }
+
+  if (action.action_type === "create_recruit") {
+    const fullName = typeof payload.full_name === "string" && payload.full_name.trim() ? payload.full_name.trim() : null;
+    if (!fullName) {
+      return NextResponse.json({ ok: false, message: "Recruit name is required before Copilot can create a recruit." }, { status: 400 });
+    }
+
+    const { error: recruitError } = await supabase.from("agent_recruits").insert({
+      full_name: fullName,
+      email: typeof payload.email === "string" ? payload.email : "",
+      phone: typeof payload.phone === "string" ? payload.phone : null,
+      source: typeof payload.source === "string" ? payload.source : "Copilot",
+      status: "new_lead",
+      assigned_recruiter_id: profile.id,
+      created_by: profile.id,
+      follow_up_at: parseDueDate(payload.follow_up_at),
+      notes: typeof payload.notes === "string" ? payload.notes : action.action_summary,
+    });
+
+    if (recruitError) throw recruitError;
+    completionMessage = "Recruit created.";
+    completed = true;
+  }
+
+  if (action.action_type === "create_merchant_onboarding") {
+    const { data: currentAgent } = await supabase
+      .from("agents")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .maybeSingle<{ id: string }>();
+    const businessName =
+      typeof payload.business_name === "string" && payload.business_name.trim()
+        ? payload.business_name.trim()
+        : typeof payload.source_text === "string"
+          ? extractBusinessName(payload.source_text)
+          : null;
+
+    if (!businessName) {
+      return NextResponse.json({ ok: false, message: "Business name is required before Copilot can create onboarding." }, { status: 400 });
+    }
+
+    const { error: onboardingError } = await supabase.from("merchant_onboarding_records").insert({
+      business_name: businessName,
+      contact_name: typeof payload.contact_name === "string" ? payload.contact_name : "Primary Contact",
+      contact_email: typeof payload.contact_email === "string" ? payload.contact_email : null,
+      contact_phone: typeof payload.contact_phone === "string" ? payload.contact_phone : null,
+      industry: typeof payload.industry === "string" ? payload.industry : null,
+      processing_needs: typeof payload.processing_needs === "string" ? payload.processing_needs : action.action_summary,
+      monthly_volume_estimate: typeof payload.monthly_volume_estimate === "number" ? payload.monthly_volume_estimate : 0,
+      average_ticket: typeof payload.average_ticket === "number" ? payload.average_ticket : 0,
+      current_processor: typeof payload.current_processor === "string" ? payload.current_processor : null,
+      status: "application_started",
+      assigned_agent_id: currentAgent?.id ?? null,
+      follow_up_at: parseDueDate(payload.follow_up_at),
+      notes: typeof payload.notes === "string" ? payload.notes : action.action_summary,
+    });
+
+    if (onboardingError) throw onboardingError;
+    completionMessage = "Merchant onboarding record created.";
+    completed = true;
+  }
+
+  if (action.action_type === "create_signature_request") {
+    const recipientEmail = typeof payload.recipient_email === "string" ? payload.recipient_email : null;
+    if (!recipientEmail) {
+      return NextResponse.json({ ok: false, message: "Recipient email is required before Copilot can create a signature request." }, { status: 400 });
+    }
+
+    const { error: signatureError } = await supabase.from("signature_requests").insert({
+      title: typeof payload.title === "string" ? payload.title : "Signature request",
+      recipient_name: typeof payload.recipient_name === "string" ? payload.recipient_name : "Recipient",
+      recipient_email: recipientEmail,
+      recipient_profile_id: typeof payload.recipient_profile_id === "string" ? payload.recipient_profile_id : null,
+      related_entity_type: isSignatureEntityType(payload.related_entity_type) ? payload.related_entity_type : "merchant",
+      related_entity_id: typeof payload.related_entity_id === "string" ? payload.related_entity_id : merchantId,
+      document_id: typeof payload.document_id === "string" ? payload.document_id : null,
+      provider: "manual",
+      status: payload.send_now === false ? "draft" : "sent",
+      metadata: { created_by_copilot: true, summary: action.action_summary },
+      created_by: profile.id,
+      sent_at: payload.send_now === false ? null : new Date().toISOString(),
+    });
+
+    if (signatureError) throw signatureError;
+    completionMessage = "Signature request created.";
+    completed = true;
+  }
+
+  if (action.action_type === "knowledge_capture") {
+    const title = typeof payload.title === "string" && payload.title.trim() ? payload.title.trim() : "Company knowledge";
+    const content = typeof payload.content === "string" && payload.content.trim() ? payload.content.trim() : null;
+    if (!content) {
+      return NextResponse.json({ ok: false, message: "Knowledge content is required before Copilot can save memory." }, { status: 400 });
+    }
+
+    const { error: memoryError } = await supabase.from("copilot_memories").insert({
+      scope: isMemoryScope(payload.scope) ? payload.scope : "company",
+      title,
+      content,
+      entity_id: typeof payload.entity_id === "string" ? payload.entity_id : merchantId,
+      confidence: typeof payload.confidence === "number" ? payload.confidence : 0.8,
+      source_type: "confirmed_action",
+      source_id: action.id,
+      metadata: { action_type: action.action_type },
+      created_by: profile.id,
+    });
+
+    if (memoryError) throw memoryError;
+    completionMessage = "Copilot memory saved.";
     completed = true;
   }
 
@@ -202,6 +313,10 @@ export async function POST(
   revalidatePath("/copilot");
   revalidatePath("/messages");
   revalidatePath("/merchants");
+  revalidatePath("/recruitment");
+  revalidatePath("/merchant-onboarding");
+  revalidatePath("/documents");
+  revalidatePath("/settings");
   if (merchantId) revalidatePath(`/merchants/${merchantId}`);
 
   return NextResponse.json({ ok: true, message: completionMessage, status: completed ? "completed" : "confirmed" });
@@ -213,6 +328,20 @@ function isMerchantStatus(value: string): value is MerchantStatus {
 
 function isPriority(value: unknown): value is "low" | "medium" | "high" {
   return value === "low" || value === "medium" || value === "high";
+}
+
+function isSignatureEntityType(value: unknown): value is "agent" | "recruit" | "merchant" | "account" {
+  return value === "agent" || value === "recruit" || value === "merchant" || value === "account";
+}
+
+function isMemoryScope(value: unknown): value is "company" | "merchant" | "agent" | "user" {
+  return value === "company" || value === "merchant" || value === "agent" || value === "user";
+}
+
+function parseDueDate(value: unknown) {
+  if (typeof value !== "string" || !value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function extractBusinessName(sourceText: string) {

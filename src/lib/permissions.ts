@@ -179,6 +179,27 @@ export const enterpriseSettingDefaults: EnterpriseSetting[] = [
     updated_at: new Date(0).toISOString(),
   },
   {
+    setting_key: "copilot_learning_enabled",
+    setting_value: { enabled: true },
+    description: "Allow Copilot to retain non-secret company knowledge from conversations and confirmed actions.",
+    updated_by: null,
+    updated_at: new Date(0).toISOString(),
+  },
+  {
+    setting_key: "copilot_model",
+    setting_value: { model: "gpt-5.4", reasoning: "medium" },
+    description: "Default OpenAI model and reasoning profile used by MerchantDesk Copilot.",
+    updated_by: null,
+    updated_at: new Date(0).toISOString(),
+  },
+  {
+    setting_key: "copilot_memory_export_enabled",
+    setting_value: { enabled: true },
+    description: "Allow admins to export retained Copilot memory for portability and vendor migration.",
+    updated_by: null,
+    updated_at: new Date(0).toISOString(),
+  },
+  {
     setting_key: "session_timeout_minutes",
     setting_value: { minutes: 60 },
     description: "Target idle session timeout policy for enterprise SSO/Auth configuration.",

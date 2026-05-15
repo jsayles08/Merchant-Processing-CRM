@@ -544,6 +544,22 @@ export const demoData: CrmData = {
   },
   rolePermissions: defaultRolePermissions(),
   enterpriseSettings: enterpriseSettingDefaults,
+  copilotMemories: [
+    {
+      id: "demo-memory-1",
+      scope: "company",
+      title: "MerchantDesk sales standard",
+      content: "Confirm monthly volume, average ticket, current processor, owner contact, and statement availability before moving a merchant into underwriting.",
+      entity_id: null,
+      confidence: 0.9,
+      source_type: "seed",
+      source_id: null,
+      metadata: {},
+      created_by: null,
+      created_at: now,
+      updated_at: now,
+    },
+  ],
 };
 
 demoData.deals = demoData.merchants.map((merchant) => {

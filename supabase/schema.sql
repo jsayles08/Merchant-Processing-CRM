@@ -379,6 +379,21 @@ create table if not exists copilot_actions (
 alter table copilot_actions add column if not exists payload jsonb;
 alter table copilot_actions add column if not exists confirmed_at timestamptz;
 
+create table if not exists copilot_memories (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null default 'company' check (scope in ('company', 'merchant', 'agent', 'user')),
+  title text not null,
+  content text not null,
+  entity_id uuid,
+  confidence numeric(4,3) not null default 0.700 check (confidence >= 0 and confidence <= 1),
+  source_type text not null default 'copilot_chat',
+  source_id uuid,
+  metadata jsonb not null default '{}'::jsonb,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists agent_performance_summaries (
   id uuid primary key default gen_random_uuid(),
   agent_id uuid not null references agents(id) on delete cascade,
@@ -445,6 +460,10 @@ create index if not exists signature_requests_entity_idx on signature_requests (
 create index if not exists signature_requests_recipient_idx on signature_requests (recipient_profile_id, created_at desc);
 create index if not exists role_permissions_role_idx on role_permissions (role, permission_key);
 create index if not exists enterprise_settings_updated_idx on enterprise_settings (updated_at desc);
+create index if not exists copilot_memories_scope_idx on copilot_memories (scope, updated_at desc);
+create index if not exists copilot_memories_entity_idx on copilot_memories (entity_id, updated_at desc);
+create unique index if not exists copilot_memories_seed_unique_idx on copilot_memories (scope, title, source_type)
+where source_type = 'seed';
 
 grant select, insert, update, delete on
   agent_recruits,
@@ -458,7 +477,8 @@ to authenticated;
 
 grant select, insert, update, delete on
   role_permissions,
-  enterprise_settings
+  enterprise_settings,
+  copilot_memories
 to authenticated;
 
 create or replace function set_updated_at()
@@ -502,6 +522,10 @@ for each row execute function set_updated_at();
 
 drop trigger if exists enterprise_settings_set_updated_at on enterprise_settings;
 create trigger enterprise_settings_set_updated_at before update on enterprise_settings
+for each row execute function set_updated_at();
+
+drop trigger if exists copilot_memories_set_updated_at on copilot_memories;
+create trigger copilot_memories_set_updated_at before update on copilot_memories
 for each row execute function set_updated_at();
 
 create or replace function sync_deal_pricing_approval()
@@ -709,6 +733,19 @@ values
   ('restrict_exports_to_leadership', '{"enabled":true}'::jsonb, 'Keep book exports limited to manager and admin roles.'),
   ('audit_sensitive_actions', '{"enabled":true}'::jsonb, 'Record sensitive changes for compliance review and dispute resolution.'),
   ('api_access_enabled', '{"enabled":false}'::jsonb, 'Controls whether external API integrations should be allowed.'),
+  ('copilot_learning_enabled', '{"enabled":true}'::jsonb, 'Allow Copilot to retain approved non-secret company knowledge from conversations and confirmed actions.'),
+  ('copilot_model', '{"model":"gpt-5.4","reasoning":"medium"}'::jsonb, 'Default OpenAI model and reasoning profile used by MerchantDesk Copilot.'),
+  ('copilot_memory_export_enabled', '{"enabled":true}'::jsonb, 'Allow admins to export retained Copilot memory for portability and vendor migration.'),
   ('session_timeout_minutes', '{"minutes":60}'::jsonb, 'Target idle session timeout used for enterprise security policy.'),
   ('data_retention_years', '{"years":7}'::jsonb, 'Default business data retention window for operations and backup policies.')
 on conflict (setting_key) do nothing;
+
+insert into copilot_memories (scope, title, content, confidence, source_type)
+values (
+  'company',
+  'MerchantDesk underwriting readiness',
+  'Before a merchant moves into underwriting, collect monthly volume, average ticket, current processor, owner contact information, statements, and pricing approval status.',
+  0.900,
+  'seed'
+)
+on conflict do nothing;

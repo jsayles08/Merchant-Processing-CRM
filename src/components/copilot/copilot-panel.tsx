@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, CheckCircle2, Lightbulb, Send, Sparkles, UserRound } from "lucide-react";
+import { Bot, BrainCircuit, CheckCircle2, Lightbulb, Send, Sparkles, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,8 @@ const examples = [
   "Add a new merchant called Buffalo Auto Detail. Contact is Sarah. She wants a quote.",
   "Move ABC Grocery to underwriting.",
   "Which merchants should I follow up with today?",
-  "Estimate my monthly residual if these 3 deals close.",
+  "Remember: our underwriting handoff requires 3 months of statements and owner contact verification.",
+  "Create a recruit lead for Jordan Lee from LinkedIn and remind me tomorrow.",
 ];
 
 export function CopilotPanel({
@@ -70,7 +71,14 @@ export function CopilotPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMessage.content, merchantId: selectedMerchantId || null }),
       });
-      const payload = (await response.json()) as { id?: string; content?: string; actions?: CopilotAction[]; message?: string };
+      const payload = (await response.json()) as {
+        id?: string;
+        content?: string;
+        actions?: CopilotAction[];
+        memoriesCreated?: number;
+        message?: string;
+        model?: string;
+      };
 
       if (!response.ok) {
         throw new Error(payload.message ?? "Copilot request failed.");
@@ -81,10 +89,15 @@ export function CopilotPanel({
         {
           id: payload.id ?? crypto.randomUUID(),
           role: "assistant",
-          content: payload.content ?? "I processed the request, but no response content was returned.",
+          content:
+            payload.content ??
+            `I processed the request with ${payload.model ?? "Copilot"}, but no response content was returned.`,
           actions: payload.actions,
         },
       ]);
+      if (payload.memoriesCreated) {
+        setStatusMessage(`Copilot learned ${payload.memoriesCreated} reusable company ${payload.memoriesCreated === 1 ? "memory" : "memories"}.`);
+      }
     } catch (error) {
       setMessages((current) => [
         ...current,
@@ -135,11 +148,15 @@ export function CopilotPanel({
           <div className="crm-panel rounded-[24px] p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-[#0E5EC9]">
               <Sparkles className="h-4 w-4" />
-              OpenAI route included
+              GPT-5.4 intelligence layer
             </div>
             <p className="mt-2 text-sm leading-6 text-[#25425E]">
-              Messages and suggested actions persist in Supabase. Major writes stay pending until you confirm them.
+              Copilot uses CRM context, retained company memory, and confirmation-first actions so it can learn your operating style without silently changing records.
             </p>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs font-black text-[#25425E]">
+              <BrainCircuit className="h-3.5 w-3.5 text-[#0E5EC9]" />
+              Memory-aware
+            </div>
           </div>
           <div className="space-y-2">
             {examples.map((example) => (

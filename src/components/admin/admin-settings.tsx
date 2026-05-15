@@ -4,8 +4,10 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
+  BrainCircuit,
   CheckCircle2,
   DatabaseBackup,
+  Download,
   KeyRound,
   LockKeyhole,
   Save,
@@ -80,6 +82,7 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
     role,
     count: permissionCatalog.filter((permission) => permissionDraft[role]?.[permission.key]).length,
   }));
+  const canExportCopilotMemory = enterpriseDraft.copilot_memory_export_enabled?.enabled !== false;
   const sponsors = useMemo(
     () =>
       data.agents.map((agent) => {
@@ -250,6 +253,31 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
     });
   }
 
+  async function exportCopilotKnowledge() {
+    setMessage("Preparing Copilot memory export...");
+    try {
+      const response = await fetch("/api/copilot/knowledge/export");
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Copilot memory export failed.");
+      }
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `merchantdesk-copilot-memory-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setMessage(`Exported ${payload.counts?.memories ?? data.copilotMemories.length} Copilot memory records.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Copilot memory export failed.");
+    }
+  }
+
   if (currentProfile.role !== "admin") {
     return null;
   }
@@ -386,6 +414,36 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
               checked={Boolean(enterpriseDraft.api_access_enabled?.enabled)}
               onChange={(checked) => updateEnterpriseSetting("api_access_enabled", "enabled", checked)}
             />
+            <EnterpriseToggle
+              label="Copilot company learning"
+              description={settingDescription(hydratedEnterpriseSettings, "copilot_learning_enabled")}
+              checked={Boolean(enterpriseDraft.copilot_learning_enabled?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("copilot_learning_enabled", "enabled", checked)}
+            />
+            <EnterpriseToggle
+              label="Copilot memory export"
+              description={settingDescription(hydratedEnterpriseSettings, "copilot_memory_export_enabled")}
+              checked={Boolean(enterpriseDraft.copilot_memory_export_enabled?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("copilot_memory_export_enabled", "enabled", checked)}
+            />
+            <Field label="Copilot model">
+              <Input
+                value={String(enterpriseDraft.copilot_model?.model ?? "gpt-5.4")}
+                onChange={(event) => updateEnterpriseSetting("copilot_model", "model", event.target.value || "gpt-5.4")}
+              />
+            </Field>
+            <Field label="Copilot reasoning">
+              <Select
+                value={String(enterpriseDraft.copilot_model?.reasoning ?? "medium")}
+                onChange={(event) => updateEnterpriseSetting("copilot_model", "reasoning", event.target.value)}
+              >
+                <option value="none">None</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="xhigh">Extra high</option>
+              </Select>
+            </Field>
             <Field label="Session timeout target">
               <Input
                 type="number"
@@ -409,8 +467,20 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
           <div className="space-y-3">
             <EnterpriseStat icon={<UsersRound className="h-4 w-4" />} label="Active users" value={data.profiles.filter((profile) => profile.status === "active").length.toString()} />
             <EnterpriseStat icon={<ShieldCheck className="h-4 w-4" />} label="Permission records" value={hydratedPermissions.length.toString()} />
+            <EnterpriseStat icon={<BrainCircuit className="h-4 w-4" />} label="Copilot memories" value={data.copilotMemories.length.toString()} />
             <EnterpriseStat icon={<DatabaseBackup className="h-4 w-4" />} label="Audit events" value={data.auditLogs.length.toString()} />
             <EnterpriseStat icon={<KeyRound className="h-4 w-4" />} label="API policy" value={enterpriseDraft.api_access_enabled?.enabled ? "Enabled" : "Disabled"} />
+            <Button
+              className="w-full rounded-full"
+              variant="secondary"
+              type="button"
+              onClick={exportCopilotKnowledge}
+              disabled={!canExportCopilotMemory}
+              title={canExportCopilotMemory ? "Export retained Copilot memory" : "Enable Copilot memory export policy first"}
+            >
+              <Download className="h-4 w-4" />
+              Export Copilot Memory
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -8,6 +8,7 @@ import type {
   AgentRecruitUpdate,
   AuditLog,
   CompensationRule,
+  CopilotMemory,
   CrmData,
   Deal,
   Document,
@@ -64,6 +65,7 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     compensationRules,
     rolePermissions,
     enterpriseSettings,
+    copilotMemories,
     auditLogs,
   ] = await Promise.all([
     selectAll<Profile>(supabase, "profiles", "created_at"),
@@ -87,6 +89,7 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     selectAll<CompensationRule>(supabase, "compensation_rules", "created_at", false),
     selectOptionalAll<RolePermission>(supabase, "role_permissions", "updated_at", false),
     selectOptionalAll<EnterpriseSetting>(supabase, "enterprise_settings", "updated_at", false),
+    selectOptionalAll<CopilotMemory>(supabase, "copilot_memories", "updated_at", false),
     selectOptionalAll<AuditLog>(supabase, "audit_logs", "created_at", false),
   ]);
 
@@ -112,6 +115,7 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     compensationRule: compensationRules[0] ?? defaultRule,
     rolePermissions: hydrateRolePermissions(rolePermissions),
     enterpriseSettings: hydrateEnterpriseSettings(enterpriseSettings),
+    copilotMemories,
     auditLogs,
   };
 }

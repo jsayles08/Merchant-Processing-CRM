@@ -21,6 +21,7 @@ alter table role_permissions enable row level security;
 alter table enterprise_settings enable row level security;
 alter table copilot_messages enable row level security;
 alter table copilot_actions enable row level security;
+alter table copilot_memories enable row level security;
 alter table agent_performance_summaries enable row level security;
 alter table notifications enable row level security;
 alter table notification_deliveries enable row level security;
@@ -678,6 +679,41 @@ create policy "copilot actions own user"
 on copilot_actions for all
 using (user_id = auth.uid() or is_admin())
 with check (user_id = auth.uid() or is_admin());
+
+drop policy if exists "copilot memories readable by authenticated" on copilot_memories;
+create policy "copilot memories readable by authenticated"
+on copilot_memories for select
+using (auth.uid() is not null);
+
+drop policy if exists "copilot memories writable by authenticated" on copilot_memories;
+create policy "copilot memories writable by authenticated"
+on copilot_memories for insert
+with check (
+  auth.uid() is not null
+  and (
+    created_by = current_profile_id()
+    or created_by is null
+    or is_admin()
+  )
+);
+
+drop policy if exists "copilot memories update by owner manager or admin" on copilot_memories;
+drop policy if exists "copilot memories update by owner or admin" on copilot_memories;
+create policy "copilot memories update by owner or admin"
+on copilot_memories for update
+using (
+  is_admin()
+  or created_by = current_profile_id()
+)
+with check (
+  is_admin()
+  or created_by = current_profile_id()
+);
+
+drop policy if exists "admin deletes copilot memories" on copilot_memories;
+create policy "admin deletes copilot memories"
+on copilot_memories for delete
+using (is_admin());
 
 drop policy if exists "weekly summaries visible by agent or manager" on agent_performance_summaries;
 create policy "weekly summaries visible by agent or manager"
