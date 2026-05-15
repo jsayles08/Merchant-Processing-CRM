@@ -48,6 +48,12 @@ export type ProcessorConnectionStatus = "pending" | "connected" | "error" | "dis
 export type ProcessorSyncStatus = "queued" | "running" | "success" | "error";
 export type PresenceStatus = "online" | "away" | "offline";
 export type ActivitySeverity = "info" | "warning" | "error" | "security";
+export type ExportFormat = "csv" | "xlsx";
+export type PayrollProviderId = "stripe" | "gusto" | "manual";
+export type PayrollIntegrationStatus = "pending" | "connected" | "error" | "disconnected" | "syncing";
+export type PayrollAdjustmentStatus = "pending" | "approved" | "paid" | "void";
+export type UnderwritingOutcome = "approve" | "deny" | "manual_review";
+export type UnderwritingDecisionStatus = "approved" | "declined" | "manual_review";
 
 export type Profile = {
   id: string;
@@ -288,6 +294,17 @@ export type TeamMember = {
   created_at: string;
 };
 
+export type RecruitProgress = {
+  id: string;
+  recruit_id: string;
+  team_id: string | null;
+  author_profile_id: string | null;
+  status: RecruitStatus;
+  progress_percent: number;
+  note: string | null;
+  created_at: string;
+};
+
 export type CompensationRule = {
   id: string;
   rule_name: string;
@@ -363,6 +380,84 @@ export type ProcessorSyncRun = {
   metadata: Record<string, unknown>;
 };
 
+export type FinancialExport = {
+  id: string;
+  requested_by: string | null;
+  export_format: ExportFormat;
+  filters: Record<string, unknown>;
+  row_count: number;
+  total_processing_volume: number;
+  total_net_residual: number;
+  total_agent_payout: number;
+  total_company_share: number;
+  created_at: string;
+};
+
+export type PayrollExport = {
+  id: string;
+  requested_by: string | null;
+  export_format: ExportFormat;
+  filters: Record<string, unknown>;
+  row_count: number;
+  gross_commissions: number;
+  adjustments_total: number;
+  total_payout: number;
+  status: string;
+  provider: string | null;
+  created_at: string;
+};
+
+export type PayrollIntegration = {
+  id: string;
+  provider: PayrollProviderId | string;
+  display_name: string;
+  account_identifier: string;
+  status: PayrollIntegrationStatus;
+  metadata: Record<string, unknown>;
+  last_sync_at: string | null;
+  last_error: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  disconnected_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollAdjustment = {
+  id: string;
+  agent_id: string;
+  amount: number;
+  reason: string;
+  status: PayrollAdjustmentStatus;
+  effective_date: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type UnderwritingRule = {
+  id: string;
+  name: string;
+  outcome: UnderwritingOutcome;
+  enabled: boolean;
+  priority: number;
+  conditions: Record<string, unknown>;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UnderwritingDecision = {
+  id: string;
+  merchant_onboarding_id: string;
+  merchant_id: string | null;
+  decision: UnderwritingDecisionStatus;
+  triggered_rule_ids: string[];
+  reasons: Record<string, unknown>;
+  evaluated_by: string | null;
+  created_at: string;
+};
+
 export type AgentPresence = {
   profile_id: string;
   status: PresenceStatus;
@@ -407,12 +502,19 @@ export type CrmData = {
   residualImportBatches: ResidualImportBatch[];
   teams: Team[];
   teamMembers: TeamMember[];
+  recruitProgress: RecruitProgress[];
   compensationRule: CompensationRule;
   rolePermissions: RolePermission[];
   enterpriseSettings: EnterpriseSetting[];
   copilotMemories: CopilotMemory[];
   processorConnections: ProcessorConnection[];
   processorSyncRuns: ProcessorSyncRun[];
+  financialExports: FinancialExport[];
+  payrollExports: PayrollExport[];
+  payrollIntegrations: PayrollIntegration[];
+  payrollAdjustments: PayrollAdjustment[];
+  underwritingRules: UnderwritingRule[];
+  underwritingDecisions: UnderwritingDecision[];
   agentPresence: AgentPresence[];
   agentActivityLogs: AgentActivityLog[];
   auditLogs: AuditLog[];

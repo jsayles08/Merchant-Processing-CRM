@@ -7,6 +7,7 @@ alter table tasks enable row level security;
 alter table documents enable row level security;
 alter table agent_recruits enable row level security;
 alter table agent_recruit_updates enable row level security;
+alter table recruit_progress enable row level security;
 alter table agent_onboarding_records enable row level security;
 alter table agent_onboarding_steps enable row level security;
 alter table merchant_onboarding_records enable row level security;
@@ -24,6 +25,12 @@ alter table copilot_actions enable row level security;
 alter table copilot_memories enable row level security;
 alter table processor_connections enable row level security;
 alter table processor_sync_runs enable row level security;
+alter table financial_exports enable row level security;
+alter table payroll_exports enable row level security;
+alter table payroll_integrations enable row level security;
+alter table payroll_adjustments enable row level security;
+alter table underwriting_rules enable row level security;
+alter table underwriting_decisions enable row level security;
 alter table agent_presence enable row level security;
 alter table agent_activity_logs enable row level security;
 alter table agent_performance_summaries enable row level security;
@@ -625,7 +632,30 @@ using (
   is_admin()
   or sponsor_agent_id = current_agent_id()
   or agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents sponsored
+    where sponsored.id = team_members.agent_id
+      and is_manager_for(sponsored.profile_id)
+  )
+  or exists (
+    select 1
+    from agents sponsor
+    where sponsor.id = team_members.sponsor_agent_id
+      and is_manager_for(sponsor.profile_id)
+  )
 );
+
+drop policy if exists "leaders create own teams" on teams;
+create policy "leaders create own teams"
+on teams for insert
+with check (is_admin() or leader_agent_id = current_agent_id());
+
+drop policy if exists "leaders update own teams" on teams;
+create policy "leaders update own teams"
+on teams for update
+using (is_admin() or leader_agent_id = current_agent_id())
+with check (is_admin() or leader_agent_id = current_agent_id());
 
 drop policy if exists "admin manages teams" on teams;
 create policy "admin manages teams"
@@ -633,11 +663,97 @@ on teams for all
 using (is_admin())
 with check (is_admin());
 
+drop policy if exists "leaders manage sponsored team members" on team_members;
+create policy "leaders manage sponsored team members"
+on team_members for insert
+with check (
+  is_admin()
+  or sponsor_agent_id = current_agent_id()
+  or exists (
+    select 1
+    from teams t
+    where t.id = team_members.team_id
+      and t.leader_agent_id = current_agent_id()
+  )
+);
+
+drop policy if exists "leaders update sponsored team members" on team_members;
+create policy "leaders update sponsored team members"
+on team_members for update
+using (
+  is_admin()
+  or sponsor_agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents sponsor
+    where sponsor.id = team_members.sponsor_agent_id
+      and is_manager_for(sponsor.profile_id)
+  )
+)
+with check (
+  is_admin()
+  or sponsor_agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents sponsor
+    where sponsor.id = team_members.sponsor_agent_id
+      and is_manager_for(sponsor.profile_id)
+  )
+);
+
+drop policy if exists "leaders delete sponsored team members" on team_members;
+create policy "leaders delete sponsored team members"
+on team_members for delete
+using (
+  is_admin()
+  or sponsor_agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents sponsor
+    where sponsor.id = team_members.sponsor_agent_id
+      and is_manager_for(sponsor.profile_id)
+  )
+);
+
 drop policy if exists "admin manages team members" on team_members;
 create policy "admin manages team members"
 on team_members for all
 using (is_admin())
 with check (is_admin());
+
+drop policy if exists "recruit progress visible by recruiter manager or admin" on recruit_progress;
+create policy "recruit progress visible by recruiter manager or admin"
+on recruit_progress for select
+using (
+  is_admin()
+  or author_profile_id = current_profile_id()
+  or exists (
+    select 1
+    from agent_recruits r
+    where r.id = recruit_progress.recruit_id
+      and (
+        r.assigned_recruiter_id = current_profile_id()
+        or is_manager_for(r.assigned_recruiter_id)
+      )
+  )
+);
+
+drop policy if exists "recruit progress insert by recruiter manager or admin" on recruit_progress;
+create policy "recruit progress insert by recruiter manager or admin"
+on recruit_progress for insert
+with check (
+  is_admin()
+  or author_profile_id = current_profile_id()
+  or exists (
+    select 1
+    from agent_recruits r
+    where r.id = recruit_progress.recruit_id
+      and (
+        r.assigned_recruiter_id = current_profile_id()
+        or is_manager_for(r.assigned_recruiter_id)
+      )
+  )
+);
 
 drop policy if exists "compensation rules readable" on compensation_rules;
 create policy "compensation rules readable"
@@ -814,6 +930,94 @@ with check (
       )
   )
 );
+
+drop policy if exists "financial exports visible to requester or admin" on financial_exports;
+create policy "financial exports visible to requester or admin"
+on financial_exports for select
+using (is_admin() or requested_by = current_profile_id());
+
+drop policy if exists "financial exports insert by admin" on financial_exports;
+create policy "financial exports insert by admin"
+on financial_exports for insert
+with check (is_admin() and requested_by = current_profile_id());
+
+drop policy if exists "payroll exports visible to requester or admin" on payroll_exports;
+create policy "payroll exports visible to requester or admin"
+on payroll_exports for select
+using (is_admin() or requested_by = current_profile_id());
+
+drop policy if exists "payroll exports insert by admin" on payroll_exports;
+create policy "payroll exports insert by admin"
+on payroll_exports for insert
+with check (is_admin() and requested_by = current_profile_id());
+
+drop policy if exists "payroll integrations readable by admin" on payroll_integrations;
+create policy "payroll integrations readable by admin"
+on payroll_integrations for select
+using (is_admin());
+
+drop policy if exists "admin manages payroll integrations" on payroll_integrations;
+create policy "admin manages payroll integrations"
+on payroll_integrations for all
+using (is_admin())
+with check (is_admin());
+
+drop policy if exists "payroll adjustments visible by agent manager or admin" on payroll_adjustments;
+create policy "payroll adjustments visible by agent manager or admin"
+on payroll_adjustments for select
+using (
+  is_admin()
+  or agent_id = current_agent_id()
+  or exists (
+    select 1
+    from agents a
+    where a.id = payroll_adjustments.agent_id
+      and is_manager_for(a.profile_id)
+  )
+);
+
+drop policy if exists "admin manages payroll adjustments" on payroll_adjustments;
+create policy "admin manages payroll adjustments"
+on payroll_adjustments for all
+using (is_admin())
+with check (is_admin());
+
+drop policy if exists "underwriting rules readable by authenticated" on underwriting_rules;
+create policy "underwriting rules readable by authenticated"
+on underwriting_rules for select
+using (auth.uid() is not null);
+
+drop policy if exists "admin manages underwriting rules" on underwriting_rules;
+create policy "admin manages underwriting rules"
+on underwriting_rules for all
+using (is_admin())
+with check (is_admin());
+
+drop policy if exists "underwriting decisions visible by assigned manager or admin" on underwriting_decisions;
+create policy "underwriting decisions visible by assigned manager or admin"
+on underwriting_decisions for select
+using (
+  is_admin()
+  or exists (
+    select 1
+    from merchant_onboarding_records mor
+    where mor.id = underwriting_decisions.merchant_onboarding_id
+      and (
+        mor.assigned_agent_id = current_agent_id()
+        or exists (
+          select 1
+          from agents a
+          where a.id = mor.assigned_agent_id
+            and is_manager_for(a.profile_id)
+        )
+      )
+  )
+);
+
+drop policy if exists "underwriting decisions insert by authenticated" on underwriting_decisions;
+create policy "underwriting decisions insert by authenticated"
+on underwriting_decisions for insert
+with check (auth.uid() is not null);
 
 drop policy if exists "agent presence visible by owner manager or admin" on agent_presence;
 create policy "agent presence visible by owner manager or admin"

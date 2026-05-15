@@ -421,6 +421,18 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
               onChange={(checked) => updateEnterpriseSetting("processor_sync_enabled", "enabled", checked)}
             />
             <EnterpriseToggle
+              label="Underwriting auto-decisions"
+              description={settingDescription(hydratedEnterpriseSettings, "underwriting_auto_decisions_enabled")}
+              checked={Boolean(enterpriseDraft.underwriting_auto_decisions_enabled?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("underwriting_auto_decisions_enabled", "enabled", checked)}
+            />
+            <EnterpriseToggle
+              label="Payroll exports"
+              description={settingDescription(hydratedEnterpriseSettings, "payroll_exports_enabled")}
+              checked={Boolean(enterpriseDraft.payroll_exports_enabled?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("payroll_exports_enabled", "enabled", checked)}
+            />
+            <EnterpriseToggle
               label="Copilot company learning"
               description={settingDescription(hydratedEnterpriseSettings, "copilot_learning_enabled")}
               checked={Boolean(enterpriseDraft.copilot_learning_enabled?.enabled)}
@@ -457,6 +469,15 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
                 max="720"
                 value={String(enterpriseDraft.session_timeout_minutes?.minutes ?? 60)}
                 onChange={(event) => updateEnterpriseSetting("session_timeout_minutes", "minutes", Number(event.target.value) || 60)}
+              />
+            </Field>
+            <Field label="Team recruit limit">
+              <Input
+                type="number"
+                min="1"
+                max="12"
+                value={String(enterpriseDraft.team_recruit_limit?.limit ?? 4)}
+                onChange={(event) => updateEnterpriseSetting("team_recruit_limit", "limit", Number(event.target.value) || 4)}
               />
             </Field>
             <Field label="Data retention target">

@@ -8,7 +8,7 @@ export default async function CompensationPage() {
   return (
     <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Compensation" eyebrow="Residuals and overrides" activeHref="/compensation">
       <div className="w-full">
-        <CompensationOverview data={data} currentAgentId={currentAgentId} />
+        <CompensationOverview data={data} currentAgentId={currentAgentId} currentProfile={profile} />
       </div>
     </AppShell>
   );

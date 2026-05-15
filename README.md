@@ -31,6 +31,11 @@ Production-minded merchant processing CRM for agents, managers, and admins to ma
 - Agent presence heartbeat, login/logout activity logs, sync history, and admin activity monitoring
 - Audit log foundation for merchant edits, pricing approvals, user creation, residual imports, reassignment, and Copilot confirmations
 - Manager assignment, bulk merchant reassignment, and processor residual CSV import workflows
+- Team management workspace with four-recruit capacity controls and recruit progress tracking
+- Role-scoped analytics for agents, managers, and admins
+- CPA-ready financial CSV exports with audited totals and filters
+- Payroll CSV exports, payroll adjustment support, and provider adapter boundaries for Stripe, Gusto, and manual payroll
+- Configurable underwriting rules with automatic approve, decline, and manual-review decisions
 - Production health endpoint at `/api/health`
 - GitHub Actions CI for lint/build
 - App-level loading, not-found, and error boundaries
@@ -60,6 +65,9 @@ OPENAI_MODEL=gpt-5.2
 CRON_SECRET=
 MERCHANTDESK_API_KEY=
 INTEGRATION_ENCRYPTION_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+GUSTO_API_KEY=
 FISERV_OAUTH_AUTHORIZATION_URL=
 FISERV_OAUTH_CLIENT_ID=
 FISERV_OAUTH_CLIENT_SECRET=
@@ -100,6 +108,8 @@ The schema includes:
 - `copilot_messages`, `copilot_actions`
 - `agent_performance_summaries`, `notifications`, `notification_deliveries`
 - `processor_connections`, `processor_sync_runs`, `agent_presence`, `agent_activity_logs`
+- `recruit_progress`, `financial_exports`, `payroll_exports`, `payroll_integrations`, `payroll_adjustments`
+- `underwriting_rules`, `underwriting_decisions`
 - `audit_logs`, `residual_import_batches`
 - private Supabase Storage bucket `merchant-documents` with signed document links
 
@@ -186,6 +196,16 @@ POST /api/activity/heartbeat
 ```
 
 Fiserv/CardConnect OAuth uses `FISERV_OAUTH_CLIENT_ID`, `FISERV_OAUTH_CLIENT_SECRET`, and `FISERV_OAUTH_REDIRECT_URI` once the production client is issued. Until then, the adapter validates encrypted credentials and records sync runs through the provider abstraction.
+
+## Finance, Payroll, Teams, And Underwriting
+
+Admins can generate CPA exports in `/reports` and payroll exports in `/compensation`. Export actions are server-side, permission-restricted, and written to audit/activity tables. CSV is supported now; XLSX can be added by installing an XLSX library and reusing the export row builders.
+
+Team management lives at `/teams`. Team capacity defaults to four recruits or active team members and can be changed in Settings through `team_recruit_limit`.
+
+Underwriting automation lives in `/settings`. Admins can update rules for document completion, volume, ticket size, proposed rate, and risk keywords. Moving a merchant onboarding record to `under_review` runs automatic decisions when `underwriting_auto_decisions_enabled` is enabled.
+
+Payroll provider connections use `INTEGRATION_ENCRYPTION_KEY` to encrypt credentials in `payroll_integrations.encrypted_credentials`. Stripe and Gusto are adapter stubs until production provider credentials and payout flow details are finalized.
 
 ## Weekly Summary Job
 

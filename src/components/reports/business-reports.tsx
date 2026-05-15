@@ -2,6 +2,7 @@ import { AlertTriangle, BarChart3, CircleDollarSign, UsersRound } from "lucide-r
 import type { CrmData, Profile } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FinanceExporter } from "@/components/reports/finance-exporter";
 import { ResidualImporter } from "@/components/reports/residual-importer";
 import { currency, daysBetween, percent } from "@/lib/utils";
 
@@ -103,13 +104,15 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
 
       {currentProfile.role === "admin" ? <ResidualImporter /> : null}
 
+      {currentProfile.role === "admin" ? <FinanceExporter data={data} /> : null}
+
       {currentProfile.role === "admin" ? (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Imports</CardTitle>
-            <CardDescription>Processor import batches and exception counts.</CardDescription>
+            <CardTitle>Recent Imports & Exports</CardTitle>
+            <CardDescription>Processor import batches plus finance export audit records.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="grid gap-3 lg:grid-cols-2">
             {data.residualImportBatches.slice(0, 5).map((batch) => (
               <div key={batch.id} className="crm-panel rounded-[24px] p-4 text-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -122,7 +125,20 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
                 {batch.error_summary ? <p className="mt-3 whitespace-pre-line text-xs text-[#D57D25]">{batch.error_summary}</p> : null}
               </div>
             ))}
-            {!data.residualImportBatches.length ? <p className="text-sm text-slate-500">No processor imports yet.</p> : null}
+            {data.financialExports.slice(0, 5).map((financialExport) => (
+              <div key={financialExport.id} className="crm-panel rounded-[24px] p-4 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-[#0B0F15]">CPA export</p>
+                    <p className="mt-1 text-slate-500">
+                      {financialExport.row_count} rows · {currency(financialExport.total_net_residual)} residual
+                    </p>
+                  </div>
+                  <Badge tone="blue">{financialExport.export_format}</Badge>
+                </div>
+              </div>
+            ))}
+            {!data.residualImportBatches.length && !data.financialExports.length ? <p className="text-sm text-slate-500">No imports or exports yet.</p> : null}
           </CardContent>
         </Card>
       ) : null}

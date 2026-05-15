@@ -5,6 +5,7 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Database,
+  FileSpreadsheet,
   FileSignature,
   GraduationCap,
   HandCoins,
@@ -20,6 +21,7 @@ import {
   Store,
   Upload,
   UserPlus,
+  UsersRound,
 } from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
 import { BrandLogo } from "@/components/brand-logo";
@@ -38,21 +40,25 @@ type NavItem = {
 const topNavItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Recruitment", icon: UserPlus, href: "/recruitment" },
+  { label: "Teams", icon: UsersRound, href: "/teams" },
   { label: "Agent Onboarding", icon: GraduationCap, href: "/agent-onboarding" },
   { label: "Merchant Onboarding", icon: Store, href: "/merchant-onboarding" },
   { label: "Merchants", icon: BriefcaseBusiness, href: "/merchants" },
   { label: "Documents", icon: FileSignature, href: "/documents" },
   { label: "Analytics", icon: BarChart3, href: "/analytics" },
+  { label: "Reports", icon: FileSpreadsheet, href: "/reports" },
 ];
 
 const railItems: NavItem[] = [
   { label: "Search merchants", icon: Search, href: "/merchants" },
   { label: "Recruitment", icon: UserPlus, href: "/recruitment" },
+  { label: "Teams", icon: UsersRound, href: "/teams" },
   { label: "Agent Onboarding", icon: GraduationCap, href: "/agent-onboarding" },
   { label: "Merchant Onboarding", icon: Store, href: "/merchant-onboarding" },
   { label: "Opportunities", icon: Share2, href: "/opportunities" },
   { label: "Documents", icon: Upload, href: "/documents" },
   { label: "Analytics", icon: BarChart3, href: "/analytics" },
+  { label: "Reports", icon: FileSpreadsheet, href: "/reports" },
   { label: "Add merchant", icon: Plus, href: "/merchants#add-merchant", permissionKey: "merchants.create" },
   { label: "Compensation", icon: HandCoins, href: "/compensation" },
   { label: "Data room", icon: Database, href: "/documents" },

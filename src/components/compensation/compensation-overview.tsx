@@ -1,16 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PayrollWorkspace } from "@/components/compensation/payroll-workspace";
 import { brand } from "@/lib/branding";
 import { calculateMonthlyAgentIncome } from "@/lib/compensation";
-import type { CrmData } from "@/lib/types";
+import type { CrmData, Profile } from "@/lib/types";
 import { currency, percent } from "@/lib/utils";
 
 export function CompensationOverview({
   data,
   currentAgentId,
+  currentProfile,
 }: {
   data: CrmData;
   currentAgentId: string;
+  currentProfile: Profile;
 }) {
   const currentAgent = data.agents.find((agent) => agent.id === currentAgentId);
   const agentIncome = calculateMonthlyAgentIncome({
@@ -70,6 +73,8 @@ export function CompensationOverview({
           {!data.teamMembers.length ? <p className="text-sm text-slate-500">No team members assigned yet.</p> : null}
         </CardContent>
       </Card>
+
+      {currentProfile.role === "admin" ? <PayrollWorkspace data={data} /> : null}
     </section>
   );
 }

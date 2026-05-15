@@ -14,17 +14,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { BarChart3, CheckCircle2, ClipboardList, TrendingUp, UserPlus } from "lucide-react";
+import { BarChart3, CheckCircle2, ClipboardList, DollarSign, TrendingUp, UserPlus, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { CrmData } from "@/lib/types";
+import type { CrmData, Profile } from "@/lib/types";
+import { currency } from "@/lib/utils";
 import { buildWorkflowAnalytics, type ChartDatum } from "@/lib/workflow-analytics";
 
 const chartColors = ["#0E5EC9", "#25425E", "#E9D7A1", "#D57D25", "#0B0F15", "#88A6B6", "#C8D3D9", "#FDFDFD"];
 
-export function CrmAnalytics({ data, compact = false }: { data: CrmData; compact?: boolean }) {
-  const analytics = buildWorkflowAnalytics(data);
+export function CrmAnalytics({ data, currentProfile, compact = false }: { data: CrmData; currentProfile?: Profile; compact?: boolean }) {
+  const analytics = buildWorkflowAnalytics(data, currentProfile);
   const hasWorkflowData =
     data.agentRecruits.length ||
     data.agentOnboardingRecords.length ||
@@ -34,10 +35,17 @@ export function CrmAnalytics({ data, compact = false }: { data: CrmData; compact
   return (
     <section className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={<UserPlus className="h-4 w-4" />} label="Recruits" value={analytics.metrics.totalRecruits} accent="+ pipeline" />
+        <MetricCard icon={<UsersRound className="h-4 w-4" />} label={currentProfile?.role === "admin" ? "Total agents" : "Visible agents"} value={analytics.metrics.totalAgents} accent={`${analytics.metrics.activeAgents} active`} />
+        <MetricCard icon={<UserPlus className="h-4 w-4" />} label="Recruits" value={analytics.metrics.totalRecruits} accent={`${analytics.metrics.recruitsPerTeam} per team`} />
         <MetricCard icon={<TrendingUp className="h-4 w-4" />} label="Recruit conversion" value={`${analytics.metrics.recruitConversionRate}%`} accent="active agents" />
         <MetricCard icon={<CheckCircle2 className="h-4 w-4" />} label="Agent onboarding" value={`${analytics.metrics.agentOnboardingCompletion}%`} accent="completion" />
-        <MetricCard icon={<ClipboardList className="h-4 w-4" />} label="Pending follow-ups" value={analytics.metrics.pendingFollowUps} accent="tasks + workflows" />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard icon={<ClipboardList className="h-4 w-4" />} label="Applications" value={analytics.metrics.applicationCount} accent={`${analytics.metrics.approvalRate}% approved`} />
+        <MetricCard icon={<BarChart3 className="h-4 w-4" />} label="Denial rate" value={`${analytics.metrics.denialRate}%`} accent={`${analytics.metrics.activeMerchantPipeline} active`} />
+        <MetricCard icon={<DollarSign className="h-4 w-4" />} label="Payroll total" value={currency(analytics.metrics.payrollTotal)} accent="visible scope" />
+        <MetricCard icon={<ClipboardList className="h-4 w-4" />} label="Pending follow-ups" value={analytics.metrics.pendingFollowUps} accent={analytics.scope === "admin" ? "company" : analytics.scope} />
       </div>
 
       {!hasWorkflowData ? (

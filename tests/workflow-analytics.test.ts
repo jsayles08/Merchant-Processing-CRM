@@ -17,4 +17,16 @@ describe("workflow analytics", () => {
     expect(analytics.recruitStatus.find((item) => item.name === "Interested")?.value).toBe(1);
     expect(analytics.merchantOnboardingStatus.find((item) => item.name === "Under Review")?.value).toBe(1);
   });
+
+  it("scopes analytics for agents while admins see the company", () => {
+    const admin = demoData.profiles.find((profile) => profile.role === "admin");
+    const agent = demoData.profiles.find((profile) => profile.id === "profile-agent-3");
+
+    const adminAnalytics = buildWorkflowAnalytics(demoData, admin);
+    const agentAnalytics = buildWorkflowAnalytics(demoData, agent);
+
+    expect(adminAnalytics.metrics.totalAgents).toBe(3);
+    expect(agentAnalytics.metrics.totalAgents).toBe(1);
+    expect(agentAnalytics.scopedData.merchants.every((merchant) => merchant.assigned_agent_id === "agent-3")).toBe(true);
+  });
 });

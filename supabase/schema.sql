@@ -181,6 +181,25 @@ create table if not exists agent_recruit_updates (
   created_at timestamptz not null default now()
 );
 
+create table if not exists recruit_progress (
+  id uuid primary key default gen_random_uuid(),
+  recruit_id uuid not null references agent_recruits(id) on delete cascade,
+  team_id uuid,
+  author_profile_id uuid references profiles(id) on delete set null,
+  status text not null check (status in (
+    'new_lead',
+    'contacted',
+    'interested',
+    'application_started',
+    'onboarding',
+    'active',
+    'rejected'
+  )),
+  progress_percent integer not null default 0 check (progress_percent between 0 and 100),
+  note text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists agent_onboarding_records (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid references profiles(id) on delete set null,
@@ -425,6 +444,85 @@ create table if not exists processor_sync_runs (
   metadata jsonb not null default '{}'::jsonb
 );
 
+create table if not exists financial_exports (
+  id uuid primary key default gen_random_uuid(),
+  requested_by uuid references profiles(id) on delete set null,
+  export_format text not null default 'csv' check (export_format in ('csv', 'xlsx')),
+  filters jsonb not null default '{}'::jsonb,
+  row_count integer not null default 0,
+  total_processing_volume numeric(14,2) not null default 0,
+  total_net_residual numeric(12,2) not null default 0,
+  total_agent_payout numeric(12,2) not null default 0,
+  total_company_share numeric(12,2) not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists payroll_exports (
+  id uuid primary key default gen_random_uuid(),
+  requested_by uuid references profiles(id) on delete set null,
+  export_format text not null default 'csv' check (export_format in ('csv', 'xlsx')),
+  filters jsonb not null default '{}'::jsonb,
+  row_count integer not null default 0,
+  gross_commissions numeric(12,2) not null default 0,
+  adjustments_total numeric(12,2) not null default 0,
+  total_payout numeric(12,2) not null default 0,
+  status text not null default 'generated' check (status in ('generated', 'sent', 'failed')),
+  provider text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists payroll_integrations (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null,
+  display_name text not null,
+  account_identifier text not null,
+  status text not null default 'pending' check (status in ('pending', 'connected', 'error', 'disconnected', 'syncing')),
+  encrypted_credentials text,
+  metadata jsonb not null default '{}'::jsonb,
+  last_sync_at timestamptz,
+  last_error text,
+  created_by uuid references profiles(id) on delete set null,
+  updated_by uuid references profiles(id) on delete set null,
+  disconnected_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists payroll_adjustments (
+  id uuid primary key default gen_random_uuid(),
+  agent_id uuid not null references agents(id) on delete cascade,
+  amount numeric(12,2) not null default 0,
+  reason text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'paid', 'void')),
+  effective_date date not null default current_date,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists underwriting_rules (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  outcome text not null check (outcome in ('approve', 'deny', 'manual_review')),
+  enabled boolean not null default true,
+  priority integer not null default 100,
+  conditions jsonb not null default '{}'::jsonb,
+  created_by uuid references profiles(id) on delete set null,
+  updated_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists underwriting_decisions (
+  id uuid primary key default gen_random_uuid(),
+  merchant_onboarding_id uuid not null references merchant_onboarding_records(id) on delete cascade,
+  merchant_id uuid references merchants(id) on delete set null,
+  decision text not null check (decision in ('approved', 'declined', 'manual_review')),
+  triggered_rule_ids uuid[] not null default '{}',
+  reasons jsonb not null default '{}'::jsonb,
+  evaluated_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists agent_presence (
   profile_id uuid primary key references profiles(id) on delete cascade,
   status text not null default 'offline' check (status in ('online', 'away', 'offline')),
@@ -506,6 +604,8 @@ create index if not exists residual_import_batches_created_idx on residual_impor
 create index if not exists agent_recruits_status_idx on agent_recruits (status, updated_at desc);
 create index if not exists agent_recruits_recruiter_idx on agent_recruits (assigned_recruiter_id, follow_up_at);
 create index if not exists agent_recruit_updates_recruit_idx on agent_recruit_updates (recruit_id, created_at desc);
+create index if not exists recruit_progress_recruit_idx on recruit_progress (recruit_id, created_at desc);
+create index if not exists recruit_progress_team_idx on recruit_progress (team_id, created_at desc);
 create index if not exists agent_onboarding_records_status_idx on agent_onboarding_records (status, updated_at desc);
 create index if not exists agent_onboarding_steps_record_idx on agent_onboarding_steps (onboarding_id, step_order);
 create index if not exists merchant_onboarding_records_status_idx on merchant_onboarding_records (status, updated_at desc);
@@ -523,6 +623,13 @@ where source_type = 'seed';
 create index if not exists processor_connections_agent_idx on processor_connections (agent_profile_id, status, updated_at desc);
 create index if not exists processor_connections_provider_idx on processor_connections (provider, status, updated_at desc);
 create index if not exists processor_sync_runs_connection_idx on processor_sync_runs (connection_id, started_at desc);
+create index if not exists financial_exports_requested_idx on financial_exports (requested_by, created_at desc);
+create index if not exists payroll_exports_requested_idx on payroll_exports (requested_by, created_at desc);
+create index if not exists payroll_integrations_provider_idx on payroll_integrations (provider, status, updated_at desc);
+create index if not exists payroll_adjustments_agent_idx on payroll_adjustments (agent_id, effective_date desc);
+create index if not exists underwriting_rules_enabled_idx on underwriting_rules (enabled, priority);
+create unique index if not exists underwriting_rules_name_unique_idx on underwriting_rules (name);
+create index if not exists underwriting_decisions_record_idx on underwriting_decisions (merchant_onboarding_id, created_at desc);
 create index if not exists agent_presence_status_idx on agent_presence (status, last_seen_at desc);
 create index if not exists agent_activity_logs_profile_idx on agent_activity_logs (profile_id, created_at desc);
 create index if not exists agent_activity_logs_actor_idx on agent_activity_logs (actor_profile_id, created_at desc);
@@ -531,6 +638,7 @@ create index if not exists agent_activity_logs_provider_idx on agent_activity_lo
 grant select, insert, update, delete on
   agent_recruits,
   agent_recruit_updates,
+  recruit_progress,
   agent_onboarding_records,
   agent_onboarding_steps,
   merchant_onboarding_records,
@@ -547,6 +655,12 @@ to authenticated;
 grant select, insert, update, delete on
   processor_connections,
   processor_sync_runs,
+  financial_exports,
+  payroll_exports,
+  payroll_integrations,
+  payroll_adjustments,
+  underwriting_rules,
+  underwriting_decisions,
   agent_presence,
   agent_activity_logs
 to authenticated;
@@ -600,6 +714,14 @@ for each row execute function set_updated_at();
 
 drop trigger if exists processor_connections_set_updated_at on processor_connections;
 create trigger processor_connections_set_updated_at before update on processor_connections
+for each row execute function set_updated_at();
+
+drop trigger if exists payroll_integrations_set_updated_at on payroll_integrations;
+create trigger payroll_integrations_set_updated_at before update on payroll_integrations
+for each row execute function set_updated_at();
+
+drop trigger if exists underwriting_rules_set_updated_at on underwriting_rules;
+create trigger underwriting_rules_set_updated_at before update on underwriting_rules
 for each row execute function set_updated_at();
 
 drop trigger if exists agent_presence_set_updated_at on agent_presence;
@@ -815,6 +937,9 @@ values
   ('copilot_model', '{"model":"gpt-5.4","reasoning":"medium"}'::jsonb, 'Default OpenAI model and reasoning profile used by MerchantDesk Copilot.'),
   ('copilot_memory_export_enabled', '{"enabled":true}'::jsonb, 'Allow admins to export retained Copilot memory for portability and vendor migration.'),
   ('processor_sync_enabled', '{"enabled":true}'::jsonb, 'Allow encrypted processor/provider connections and sync runs.'),
+  ('underwriting_auto_decisions_enabled', '{"enabled":true}'::jsonb, 'Allow underwriting rules to make automatic application decisions.'),
+  ('team_recruit_limit', '{"limit":4}'::jsonb, 'Maximum direct recruits per team before admin override is required.'),
+  ('payroll_exports_enabled', '{"enabled":true}'::jsonb, 'Allow admins to generate payroll-ready commission exports.'),
   ('session_timeout_minutes', '{"minutes":60}'::jsonb, 'Target idle session timeout used for enterprise security policy.'),
   ('data_retention_years', '{"years":7}'::jsonb, 'Default business data retention window for operations and backup policies.')
 on conflict (setting_key) do nothing;
@@ -828,3 +953,10 @@ values (
   'seed'
 )
 on conflict do nothing;
+
+insert into underwriting_rules (name, outcome, priority, conditions)
+values
+  ('Deny risk flagged applications', 'deny', 10, '{"riskKeywords":["match list","terminated merchant file","fraud"]}'::jsonb),
+  ('Approve complete standard applications', 'approve', 100, '{"minMonthlyVolume":10000,"minDocumentCompletionRate":0.8,"minProposedRate":1.5}'::jsonb),
+  ('Manual review incomplete document packets', 'manual_review', 200, '{"maxDocumentCompletionRate":0.79}'::jsonb)
+on conflict (name) do nothing;

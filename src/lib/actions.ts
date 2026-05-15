@@ -3,24 +3,43 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { writeAgentActivity } from "@/lib/activity";
 import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
 import { brand } from "@/lib/branding";
+import { getCrmData } from "@/lib/data";
+import { buildExportAuditSummary, generateFinancialExport } from "@/lib/finance-export";
+import {
+  generatePayrollExport,
+  payrollProviders,
+  sealPayrollCredentials,
+  syncPayrollIntegration,
+  testPayrollIntegration,
+} from "@/lib/payroll";
 import { enterpriseSettingDefaults, permissionCatalog } from "@/lib/permissions";
 import { normalizeImportMonth, parseProcessorResidualCsv } from "@/lib/residual-import";
 import { createSignatureProviderRequest } from "@/lib/signature-service";
+import { isIntegrationEncryptionConfigured } from "@/lib/secret-vault";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { canAssignRecruitToTeam, defaultTeamRecruitLimit, progressForRecruitStatus } from "@/lib/team-management";
+import {
+  evaluateAndPersistUnderwritingDecision,
+  validateUnderwritingRule,
+} from "@/lib/underwriting";
 import type {
   AgentOnboardingRecord,
   AgentOnboardingStep,
   AgentRecruit,
   AgentRecruitUpdate,
   Document,
+  ExportFormat,
   Merchant,
   MerchantOnboardingRecord,
   MerchantOnboardingStatus,
   MerchantOnboardingStep,
   MerchantStatus,
+  PayrollProviderId,
+  RecruitStatus,
   Role,
   RolePermission,
   SignatureEntityType,
@@ -216,6 +235,80 @@ const EnterpriseSettingsInput = z.object({
       description: z.string().optional(),
     }),
   ),
+});
+
+const ExportFormatInput = z.enum(["csv", "xlsx"]);
+
+const ExportFiltersInput = z.object({
+  dateFrom: z.string().trim().optional(),
+  dateTo: z.string().trim().optional(),
+  teamId: z.string().trim().optional(),
+  agentId: z.string().trim().optional(),
+  status: z.string().trim().optional(),
+  processor: z.string().trim().optional(),
+});
+
+const FinancialExportInput = ExportFiltersInput.extend({
+  format: ExportFormatInput.default("csv"),
+});
+
+const PayrollExportInput = ExportFiltersInput.extend({
+  format: ExportFormatInput.default("csv"),
+  provider: z.enum(["stripe", "gusto", "manual"]).optional(),
+});
+
+const PayrollIntegrationInput = z.object({
+  provider: z.enum(["stripe", "gusto", "manual"]),
+  display_name: z.string().trim().min(2).max(120),
+  account_identifier: z.string().trim().min(2).max(120),
+  credentials: z.record(z.string(), z.string().trim()).default({}),
+});
+
+const PayrollIntegrationIdInput = z.object({
+  integration_id: z.string().uuid(),
+});
+
+const AssignRecruitToTeamInput = z.object({
+  recruit_id: z.string().uuid(),
+  team_id: z.string().uuid(),
+  note: z.string().trim().optional(),
+});
+
+const RecruitProgressInput = z.object({
+  recruit_id: z.string().uuid(),
+  team_id: z.string().uuid().nullable().optional(),
+  status: RecruitStatusInput,
+  progress_percent: z.coerce.number().min(0).max(100).optional(),
+  note: z.string().trim().optional(),
+});
+
+const UnderwritingConditionInput = z.object({
+  minMonthlyVolume: z.coerce.number().nonnegative().optional(),
+  maxMonthlyVolume: z.coerce.number().nonnegative().optional(),
+  minAverageTicket: z.coerce.number().nonnegative().optional(),
+  maxAverageTicket: z.coerce.number().nonnegative().optional(),
+  minProposedRate: z.coerce.number().nonnegative().optional(),
+  maxProposedRate: z.coerce.number().nonnegative().optional(),
+  minDocumentCompletionRate: z.coerce.number().min(0).max(1).optional(),
+  maxDocumentCompletionRate: z.coerce.number().min(0).max(1).optional(),
+  riskKeywords: z.array(z.string().trim().min(1)).optional(),
+});
+
+const UnderwritingRuleInput = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  outcome: z.enum(["approve", "deny", "manual_review"]),
+  enabled: z.boolean(),
+  priority: z.coerce.number().int().min(1).max(999),
+  conditions: UnderwritingConditionInput,
+});
+
+const UnderwritingRulesInput = z.object({
+  rules: z.array(UnderwritingRuleInput).min(1),
+});
+
+const UnderwritingRunInput = z.object({
+  onboarding_id: z.string().uuid().optional(),
 });
 
 const ResidualImportInput = z.object({
@@ -805,6 +898,36 @@ export async function updateMerchantOnboardingStatusAction(input: unknown): Prom
     metadata: { status: parsed.data.status, merchant_id: data.merchant_id },
   });
 
+  if (parsed.data.status === "under_review") {
+    const { data: setting } = await supabase
+      .from("enterprise_settings")
+      .select("setting_value")
+      .eq("setting_key", "underwriting_auto_decisions_enabled")
+      .maybeSingle<{ setting_value: { enabled?: boolean } }>();
+
+    if (setting?.setting_value?.enabled !== false) {
+      try {
+        const decision = await evaluateAndPersistUnderwritingDecision(supabase, profile, data.id);
+        revalidateWorkflowPaths();
+        return {
+          ok: true,
+          message: `Merchant onboarding updated. Underwriting routed this application to ${decision.result.decision}.`,
+          data: decision,
+        };
+      } catch (error) {
+        await writeAgentActivity(supabase, {
+          profileId: profile.id,
+          actorProfileId: profile.id,
+          eventType: "underwriting.auto_decision.failed",
+          eventSource: "underwriting",
+          severity: "warning",
+          summary: error instanceof Error ? error.message : "Underwriting auto-decision failed.",
+          metadata: { onboarding_id: data.id },
+        });
+      }
+    }
+  }
+
   revalidateWorkflowPaths();
   return { ok: true, message: "Merchant onboarding updated.", data };
 }
@@ -1382,6 +1505,510 @@ export async function updateEnterpriseSettingsAction(input: unknown): Promise<Ac
   return { ok: true, message: "Enterprise policy settings saved.", data };
 }
 
+export async function generateFinancialExportAction(input: unknown): Promise<ActionResult> {
+  const parsed = FinancialExportInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose valid finance export filters." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can export company financials." };
+  }
+
+  const data = await getCrmData(supabase);
+  const filters = normalizeExportFilters(parsed.data);
+  const exportResult = generateFinancialExport(data, filters);
+  const format = parsed.data.format as ExportFormat;
+
+  const { data: exportRow, error } = await supabase
+    .from("financial_exports")
+    .insert({
+      requested_by: profile.id,
+      export_format: format,
+      filters,
+      row_count: exportResult.rows.length,
+      total_processing_volume: exportResult.totals.processingVolume,
+      total_net_residual: exportResult.totals.netResidual,
+      total_agent_payout: exportResult.totals.agentPayout,
+      total_company_share: exportResult.totals.companyShare,
+    })
+    .select("*")
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "finance.export",
+    entityType: "financial_export",
+    entityId: exportRow?.id ?? null,
+    summary: `${profile.full_name} generated a CPA-ready financial export.`,
+    metadata: {
+      ...buildExportAuditSummary("financial", exportResult.rows.length, filters),
+      totals: exportResult.totals,
+    },
+  });
+
+  revalidatePath("/reports");
+  revalidatePath("/analytics");
+  return {
+    ok: true,
+    message: format === "xlsx" ? "CSV export generated. XLSX can be enabled when an XLSX library is added." : "Financial export generated.",
+    data: { ...exportResult, exportId: exportRow?.id ?? null, format: "csv" },
+  };
+}
+
+export async function generatePayrollExportAction(input: unknown): Promise<ActionResult> {
+  const parsed = PayrollExportInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose valid payroll export filters." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can export payroll information." };
+  }
+
+  const data = await getCrmData(supabase);
+  const filters = normalizeExportFilters(parsed.data);
+  const exportResult = generatePayrollExport(data, filters);
+  const provider = parsed.data.provider || "manual";
+  const format = parsed.data.format as ExportFormat;
+
+  const { data: exportRow, error } = await supabase
+    .from("payroll_exports")
+    .insert({
+      requested_by: profile.id,
+      export_format: format,
+      filters,
+      row_count: exportResult.rows.length,
+      gross_commissions: exportResult.totals.grossCommissions,
+      adjustments_total: exportResult.totals.adjustmentsTotal,
+      total_payout: exportResult.totals.totalPayout,
+      provider,
+    })
+    .select("*")
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "payroll.export",
+    entityType: "payroll_export",
+    entityId: exportRow?.id ?? null,
+    summary: `${profile.full_name} generated a payroll export.`,
+    metadata: {
+      ...buildExportAuditSummary("payroll", exportResult.rows.length, filters),
+      provider,
+      totals: exportResult.totals,
+    },
+  });
+
+  await writeAgentActivity(supabase, {
+    profileId: profile.id,
+    actorProfileId: profile.id,
+    eventType: "payroll.export.generated",
+    eventSource: "payroll",
+    provider,
+    summary: `${profile.full_name} generated payroll export ${exportResult.filename}.`,
+    metadata: { row_count: exportResult.rows.length, totals: exportResult.totals },
+  });
+
+  revalidatePath("/compensation");
+  revalidatePath("/reports");
+  return {
+    ok: true,
+    message: format === "xlsx" ? "CSV payroll export generated. XLSX can be enabled when an XLSX library is added." : "Payroll export generated.",
+    data: { ...exportResult, exportId: exportRow?.id ?? null, format: "csv" },
+  };
+}
+
+export async function connectPayrollIntegrationAction(input: unknown): Promise<ActionResult> {
+  const parsed = PayrollIntegrationInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Complete the payroll integration fields." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can manage payroll integrations." };
+  }
+
+  if (!isIntegrationEncryptionConfigured()) {
+    return { ok: false, message: "INTEGRATION_ENCRYPTION_KEY is required before payroll credentials can be stored." };
+  }
+
+  const testResult = await testPayrollIntegration({
+    provider: parsed.data.provider as PayrollProviderId,
+    accountIdentifier: parsed.data.account_identifier,
+    credentials: parsed.data.credentials,
+  });
+
+  let sealedCredentials: string;
+  try {
+    sealedCredentials = sealPayrollCredentials(parsed.data.credentials);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Payroll credentials could not be encrypted." };
+  }
+
+  const provider = payrollProviders.find((item) => item.id === parsed.data.provider);
+  const { data: integration, error } = await supabase
+    .from("payroll_integrations")
+    .insert({
+      provider: parsed.data.provider,
+      display_name: parsed.data.display_name,
+      account_identifier: parsed.data.account_identifier,
+      status: testResult.ok ? "connected" : "error",
+      encrypted_credentials: sealedCredentials,
+      metadata: {
+        adapter_mode: testResult.metadata?.adapter_mode ?? "credential_validation",
+        credential_fields: Object.keys(parsed.data.credentials).filter((key) => parsed.data.credentials[key]),
+      },
+      last_error: testResult.ok ? null : testResult.message,
+      created_by: profile.id,
+      updated_by: profile.id,
+    })
+    .select("*")
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAgentActivity(supabase, {
+    profileId: profile.id,
+    actorProfileId: profile.id,
+    eventType: testResult.ok ? "payroll.integration.connect.success" : "payroll.integration.connect.warning",
+    eventSource: "payroll",
+    provider: parsed.data.provider,
+    severity: testResult.ok ? "info" : "warning",
+    summary: `${profile.full_name} connected ${provider?.name ?? parsed.data.provider} payroll integration.`,
+    metadata: { status: integration.status, account_identifier: parsed.data.account_identifier },
+  });
+
+  await writeAuditLog(supabase, profile, {
+    action: "payroll.integration.connect",
+    entityType: "payroll_integration",
+    entityId: integration.id,
+    summary: `${profile.full_name} connected ${provider?.name ?? parsed.data.provider} payroll integration.`,
+    metadata: { provider: parsed.data.provider, status: integration.status },
+  });
+
+  revalidatePath("/compensation");
+  return { ok: true, message: testResult.message, data: integration };
+}
+
+export async function syncPayrollIntegrationAction(input: unknown): Promise<ActionResult> {
+  const parsed = PayrollIntegrationIdInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid payroll integration." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can sync payroll integrations." };
+  }
+
+  const { data: integration, error } = await supabase
+    .from("payroll_integrations")
+    .select("*")
+    .eq("id", parsed.data.integration_id)
+    .single();
+
+  if (error || !integration) {
+    return { ok: false, message: error?.message ?? "Payroll integration was not found." };
+  }
+
+  const syncResult = await syncPayrollIntegration(integration);
+  const now = new Date().toISOString();
+  await supabase
+    .from("payroll_integrations")
+    .update({
+      status: syncResult.status,
+      last_sync_at: syncResult.ok ? now : integration.last_sync_at,
+      last_error: syncResult.ok ? null : syncResult.message,
+      updated_by: profile.id,
+    })
+    .eq("id", integration.id);
+
+  await writeAgentActivity(supabase, {
+    profileId: profile.id,
+    actorProfileId: profile.id,
+    eventType: syncResult.ok ? "payroll.integration.sync.success" : "payroll.integration.sync.failed",
+    eventSource: "payroll",
+    provider: integration.provider,
+    severity: syncResult.ok ? "info" : "error",
+    summary: syncResult.message,
+    metadata: { records_processed: syncResult.recordsProcessed ?? 0 },
+  });
+
+  await writeAuditLog(supabase, profile, {
+    action: "payroll.integration.sync",
+    entityType: "payroll_integration",
+    entityId: integration.id,
+    summary: `${profile.full_name} synced payroll integration ${integration.display_name}.`,
+    metadata: { provider: integration.provider, status: syncResult.status },
+  });
+
+  revalidatePath("/compensation");
+  return { ok: syncResult.ok, message: syncResult.message, data: syncResult };
+}
+
+export async function disconnectPayrollIntegrationAction(input: unknown): Promise<ActionResult> {
+  const parsed = PayrollIntegrationIdInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid payroll integration." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can disconnect payroll integrations." };
+  }
+
+  const now = new Date().toISOString();
+  const { data: integration, error } = await supabase
+    .from("payroll_integrations")
+    .update({ status: "disconnected", disconnected_at: now, updated_by: profile.id, last_error: null })
+    .eq("id", parsed.data.integration_id)
+    .select("*")
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAgentActivity(supabase, {
+    profileId: profile.id,
+    actorProfileId: profile.id,
+    eventType: "payroll.integration.disconnect",
+    eventSource: "payroll",
+    provider: integration.provider,
+    summary: `${profile.full_name} disconnected payroll integration ${integration.display_name}.`,
+    metadata: { provider: integration.provider },
+  });
+
+  await writeAuditLog(supabase, profile, {
+    action: "payroll.integration.disconnect",
+    entityType: "payroll_integration",
+    entityId: integration.id,
+    summary: `${profile.full_name} disconnected payroll integration ${integration.display_name}.`,
+    metadata: { provider: integration.provider },
+  });
+
+  revalidatePath("/compensation");
+  return { ok: true, message: "Payroll integration disconnected.", data: integration };
+}
+
+export async function assignRecruitToTeamAction(input: unknown): Promise<ActionResult> {
+  const parsed = AssignRecruitToTeamInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a recruit and team assignment." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  const data = await getCrmData(supabase);
+  const team = data.teams.find((item) => item.id === parsed.data.team_id);
+  const recruit = data.agentRecruits.find((item) => item.id === parsed.data.recruit_id);
+
+  if (!team || !recruit) {
+    return { ok: false, message: "Team or recruit was not found." };
+  }
+
+  const leaderAgent = data.agents.find((agent) => agent.id === team.leader_agent_id);
+  const canManageTeam =
+    profile.role === "admin" ||
+    leaderAgent?.profile_id === profile.id ||
+    data.profiles.some((manager) => manager.id === leaderAgent?.profile_id && manager.manager_id === profile.id);
+
+  if (!canManageTeam) {
+    return { ok: false, message: "You do not have access to manage this team." };
+  }
+
+  const limit = Number(
+    data.enterpriseSettings.find((setting) => setting.setting_key === "team_recruit_limit")?.setting_value?.limit ??
+      defaultTeamRecruitLimit,
+  );
+  const capacity = canAssignRecruitToTeam(data, team, recruit, Number.isFinite(limit) ? limit : defaultTeamRecruitLimit);
+  if (!capacity.ok) {
+    return { ok: false, message: capacity.reason ?? "This team is at its recruit limit." };
+  }
+
+  const leaderProfileId = leaderAgent?.profile_id;
+  if (!leaderProfileId) {
+    return { ok: false, message: "Team leader profile was not found." };
+  }
+
+  const { error: recruitError } = await supabase
+    .from("agent_recruits")
+    .update({ assigned_recruiter_id: leaderProfileId, updated_at: new Date().toISOString() })
+    .eq("id", recruit.id);
+
+  if (recruitError) return { ok: false, message: recruitError.message };
+
+  const progressPercent = progressForRecruitStatus(recruit.status as RecruitStatus);
+  const { error: progressError } = await supabase.from("recruit_progress").insert({
+    recruit_id: recruit.id,
+    team_id: team.id,
+    author_profile_id: profile.id,
+    status: recruit.status,
+    progress_percent: progressPercent,
+    note: parsed.data.note || `Assigned to team ${team.team_number}.`,
+  });
+
+  if (progressError) return { ok: false, message: progressError.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "team.recruit_assign",
+    entityType: "agent_recruit",
+    entityId: recruit.id,
+    summary: `${profile.full_name} assigned ${recruit.full_name} to team ${team.team_number}.`,
+    metadata: { team_id: team.id, leader_agent_id: team.leader_agent_id },
+  });
+
+  revalidatePath("/teams");
+  revalidatePath("/recruitment");
+  revalidatePath("/analytics");
+  return { ok: true, message: `${recruit.full_name} was assigned to team ${team.team_number}.` };
+}
+
+export async function updateRecruitProgressAction(input: unknown): Promise<ActionResult> {
+  const parsed = RecruitProgressInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid recruit progress update." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  const progressPercent = parsed.data.progress_percent ?? progressForRecruitStatus(parsed.data.status as RecruitStatus);
+
+  const { data: recruit, error: recruitError } = await supabase
+    .from("agent_recruits")
+    .update({ status: parsed.data.status, updated_at: new Date().toISOString() })
+    .eq("id", parsed.data.recruit_id)
+    .select("id,full_name,status")
+    .single<{ id: string; full_name: string; status: RecruitStatus }>();
+
+  if (recruitError) return { ok: false, message: recruitError.message };
+
+  const { data: progress, error } = await supabase
+    .from("recruit_progress")
+    .insert({
+      recruit_id: parsed.data.recruit_id,
+      team_id: parsed.data.team_id || null,
+      author_profile_id: profile.id,
+      status: parsed.data.status,
+      progress_percent: progressPercent,
+      note: parsed.data.note || null,
+    })
+    .select("*")
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "team.recruit_progress",
+    entityType: "agent_recruit",
+    entityId: recruit.id,
+    summary: `${profile.full_name} moved ${recruit.full_name} to ${parsed.data.status}.`,
+    metadata: { status: parsed.data.status, progress_percent: progressPercent, team_id: parsed.data.team_id || null },
+  });
+
+  revalidatePath("/teams");
+  revalidatePath("/recruitment");
+  revalidatePath("/analytics");
+  return { ok: true, message: "Recruit progress updated.", data: progress };
+}
+
+export async function saveUnderwritingRulesAction(input: unknown): Promise<ActionResult> {
+  const parsed = UnderwritingRulesInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose valid underwriting rules." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can update underwriting rules." };
+  }
+
+  for (const rule of parsed.data.rules) {
+    const validation = validateUnderwritingRule(rule);
+    if (validation) {
+      return { ok: false, message: `${rule.name}: ${validation}` };
+    }
+  }
+
+  const rows = parsed.data.rules.map((rule) => ({
+    id: rule.id,
+    name: rule.name,
+    outcome: rule.outcome,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    conditions: rule.conditions,
+    updated_by: profile.id,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { data, error } = await supabase
+    .from("underwriting_rules")
+    .upsert(rows, { onConflict: "id" })
+    .select("*");
+
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: "underwriting.rules_update",
+    entityType: "underwriting_rule",
+    summary: `${profile.full_name} updated underwriting automation rules.`,
+    metadata: { rule_count: rows.length, enabled_count: rows.filter((rule) => rule.enabled).length },
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/merchant-onboarding");
+  return { ok: true, message: "Underwriting rules saved.", data };
+}
+
+export async function runUnderwritingDecisionAction(input: unknown): Promise<ActionResult> {
+  const parsed = UnderwritingRunInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid underwriting record." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can run underwriting automation." };
+  }
+
+  const onboardingIds = parsed.data.onboarding_id
+    ? [parsed.data.onboarding_id]
+    : (
+        await supabase
+          .from("merchant_onboarding_records")
+          .select("id")
+          .in("status", ["under_review", "documents_needed", "application_started"])
+          .limit(25)
+      ).data?.map((record) => record.id as string) ?? [];
+
+  if (!onboardingIds.length) {
+    return { ok: false, message: "No merchant applications are ready for underwriting." };
+  }
+
+  const results = [];
+  for (const onboardingId of onboardingIds) {
+    try {
+      results.push(await evaluateAndPersistUnderwritingDecision(supabase, profile, onboardingId));
+    } catch (error) {
+      results.push({
+        onboardingId,
+        error: error instanceof Error ? error.message : "Underwriting evaluation failed.",
+      });
+    }
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/merchant-onboarding");
+  revalidatePath("/analytics");
+  return {
+    ok: results.every((result) => !("error" in result)),
+    message: `Underwriting evaluated ${results.length} application${results.length === 1 ? "" : "s"}.`,
+    data: results,
+  };
+}
+
 export async function importResidualReportAction(input: unknown): Promise<ActionResult> {
   const parsed = ResidualImportInput.safeParse(input);
   if (!parsed.success) {
@@ -1675,6 +2302,24 @@ async function createFollowUpTask(
     priority: "medium",
     status: "open",
   });
+}
+
+function normalizeExportFilters(input: {
+  dateFrom?: string;
+  dateTo?: string;
+  teamId?: string;
+  agentId?: string;
+  status?: string;
+  processor?: string;
+}) {
+  return {
+    dateFrom: input.dateFrom || undefined,
+    dateTo: input.dateTo || undefined,
+    teamId: input.teamId && input.teamId !== "all" ? input.teamId : undefined,
+    agentId: input.agentId && input.agentId !== "all" ? input.agentId : undefined,
+    status: input.status && input.status !== "all" ? input.status : undefined,
+    processor: input.processor && input.processor !== "all" ? input.processor : undefined,
+  };
 }
 
 async function refreshAgentOnboardingProgress(supabase: SupabaseClient, onboardingId: string) {

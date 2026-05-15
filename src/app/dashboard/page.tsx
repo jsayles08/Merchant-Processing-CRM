@@ -10,7 +10,7 @@ export default async function DashboardPage() {
     <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Customer Information" eyebrow="MerchantDesk CRM" activeHref="/dashboard">
       <div className="w-full space-y-6">
         <DashboardOverview data={data} />
-        <CrmAnalytics data={data} compact />
+        <CrmAnalytics data={data} currentProfile={profile} compact />
       </div>
     </AppShell>
   );

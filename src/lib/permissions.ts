@@ -8,6 +8,8 @@ export type PermissionKey =
   | "opportunities.view"
   | "tasks.view"
   | "tasks.manage"
+  | "teams.view"
+  | "teams.manage"
   | "recruitment.view"
   | "recruitment.manage"
   | "agent_onboarding.view"
@@ -20,8 +22,11 @@ export type PermissionKey =
   | "analytics.view"
   | "reports.view"
   | "residuals.import"
+  | "finance.export"
   | "compensation.view"
   | "compensation.manage"
+  | "payroll.export"
+  | "payroll.integrations"
   | "copilot.use"
   | "copilot.confirm_actions"
   | "messages.view"
@@ -30,6 +35,7 @@ export type PermissionKey =
   | "processor_connections.manage"
   | "settings.manage_users"
   | "settings.manage_access"
+  | "underwriting.manage"
   | "system_activity.view"
   | "audit_logs.view"
   | "api.integrations"
@@ -53,6 +59,8 @@ export const permissionCatalog: PermissionCatalogItem[] = [
   { key: "opportunities.view", label: "Opportunities", description: "Open sales pipeline and approval queues.", category: "Core CRM", navHref: "/opportunities" },
   { key: "tasks.view", label: "Tasks", description: "View task and follow-up center.", category: "Core CRM", navHref: "/tasks" },
   { key: "tasks.manage", label: "Manage tasks", description: "Create, assign, and complete workflow tasks.", category: "Core CRM" },
+  { key: "teams.view", label: "Teams", description: "View team roster, recruit progress, and team performance.", category: "Growth Workflows", navHref: "/teams" },
+  { key: "teams.manage", label: "Manage teams", description: "Assign recruits and update team progress.", category: "Growth Workflows" },
   { key: "recruitment.view", label: "Recruitment", description: "View agent recruiting pipeline.", category: "Growth Workflows", navHref: "/recruitment" },
   { key: "recruitment.manage", label: "Manage recruits", description: "Create recruits, notes, and follow-ups.", category: "Growth Workflows" },
   { key: "agent_onboarding.view", label: "Agent onboarding", description: "View agent onboarding queue and checklist.", category: "Growth Workflows", navHref: "/agent-onboarding" },
@@ -65,8 +73,11 @@ export const permissionCatalog: PermissionCatalogItem[] = [
   { key: "analytics.view", label: "Analytics", description: "View interactive workflow analytics.", category: "Documents & AI", navHref: "/analytics" },
   { key: "reports.view", label: "Reports", description: "View business reporting and residual summaries.", category: "Documents & AI", navHref: "/reports" },
   { key: "residuals.import", label: "Residual imports", description: "Import processor residual reports.", category: "Documents & AI" },
+  { key: "finance.export", label: "Financial exports", description: "Export CPA-ready accounting files and financial totals.", category: "Documents & AI", adminOnly: true },
   { key: "compensation.view", label: "Compensation", description: "View compensation and override calculations.", category: "Documents & AI", navHref: "/compensation" },
   { key: "compensation.manage", label: "Manage compensation", description: "Manage compensation rules and exceptions.", category: "Documents & AI" },
+  { key: "payroll.export", label: "Payroll exports", description: "Generate payroll-ready payout files.", category: "Documents & AI", adminOnly: true },
+  { key: "payroll.integrations", label: "Payroll integrations", description: "Connect payroll/payout providers such as Stripe.", category: "Documents & AI", adminOnly: true },
   { key: "copilot.use", label: "Copilot", description: "Use the AI copilot and global chat widget.", category: "Documents & AI", navHref: "/copilot" },
   { key: "copilot.confirm_actions", label: "Confirm Copilot actions", description: "Approve Copilot-suggested CRM writes.", category: "Documents & AI" },
   { key: "messages.view", label: "Messages", description: "View Copilot/message history.", category: "Core CRM", navHref: "/messages" },
@@ -75,6 +86,7 @@ export const permissionCatalog: PermissionCatalogItem[] = [
   { key: "processor_connections.manage", label: "Processor connections", description: "Connect and sync processor/provider accounts for assigned books.", category: "Administration" },
   { key: "settings.manage_users", label: "Manage users", description: "Create users, assign managers, and reassign books.", category: "Administration", adminOnly: true },
   { key: "settings.manage_access", label: "Manage access", description: "Change role permissions and enterprise policy controls.", category: "Administration", critical: true, adminOnly: true },
+  { key: "underwriting.manage", label: "Underwriting rules", description: "Configure automatic approval, denial, and manual review guidelines.", category: "Administration", adminOnly: true },
   { key: "system_activity.view", label: "System activity", description: "View agent presence, provider connection status, sync events, and system errors.", category: "Administration", adminOnly: true },
   { key: "audit_logs.view", label: "Audit logs", description: "View sensitive action audit history.", category: "Administration" },
   { key: "api.integrations", label: "API integrations", description: "Allow external API integrations and API key access.", category: "Administration", adminOnly: true },
@@ -92,6 +104,8 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "opportunities.view": true,
     "tasks.view": true,
     "tasks.manage": true,
+    "teams.view": true,
+    "teams.manage": true,
     "recruitment.view": true,
     "recruitment.manage": true,
     "agent_onboarding.view": false,
@@ -104,8 +118,11 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "analytics.view": true,
     "reports.view": true,
     "residuals.import": false,
+    "finance.export": false,
     "compensation.view": true,
     "compensation.manage": false,
+    "payroll.export": false,
+    "payroll.integrations": false,
     "copilot.use": true,
     "copilot.confirm_actions": true,
     "messages.view": true,
@@ -114,6 +131,7 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "processor_connections.manage": true,
     "settings.manage_users": false,
     "settings.manage_access": false,
+    "underwriting.manage": false,
     "system_activity.view": false,
     "audit_logs.view": false,
     "api.integrations": false,
@@ -127,6 +145,8 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "opportunities.view": true,
     "tasks.view": true,
     "tasks.manage": true,
+    "teams.view": true,
+    "teams.manage": true,
     "recruitment.view": true,
     "recruitment.manage": true,
     "agent_onboarding.view": true,
@@ -139,8 +159,11 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "analytics.view": true,
     "reports.view": true,
     "residuals.import": false,
+    "finance.export": false,
     "compensation.view": true,
     "compensation.manage": false,
+    "payroll.export": false,
+    "payroll.integrations": false,
     "copilot.use": true,
     "copilot.confirm_actions": true,
     "messages.view": true,
@@ -149,6 +172,7 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "processor_connections.manage": true,
     "settings.manage_users": false,
     "settings.manage_access": false,
+    "underwriting.manage": false,
     "system_activity.view": false,
     "audit_logs.view": true,
     "api.integrations": false,
@@ -190,6 +214,27 @@ export const enterpriseSettingDefaults: EnterpriseSetting[] = [
     setting_key: "processor_sync_enabled",
     setting_value: { enabled: true },
     description: "Allow encrypted processor/provider account connections and manual sync runs.",
+    updated_by: null,
+    updated_at: new Date(0).toISOString(),
+  },
+  {
+    setting_key: "underwriting_auto_decisions_enabled",
+    setting_value: { enabled: true },
+    description: "Allow underwriting rules to automatically approve, decline, or route applications to manual review.",
+    updated_by: null,
+    updated_at: new Date(0).toISOString(),
+  },
+  {
+    setting_key: "team_recruit_limit",
+    setting_value: { limit: 4 },
+    description: "Maximum direct recruits per team before admin override is required.",
+    updated_by: null,
+    updated_at: new Date(0).toISOString(),
+  },
+  {
+    setting_key: "payroll_exports_enabled",
+    setting_value: { enabled: true },
+    description: "Allow admins to generate payroll-ready commission and adjustment exports.",
     updated_by: null,
     updated_at: new Date(0).toISOString(),
   },

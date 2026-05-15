@@ -7,7 +7,7 @@ export default async function AnalyticsPage() {
 
   return (
     <AppShell profile={profile} rolePermissions={data.rolePermissions} title="Analytics" eyebrow="Workflow intelligence" activeHref="/analytics">
-      <CrmAnalytics data={data} />
+      <CrmAnalytics data={data} currentProfile={profile} />
     </AppShell>
   );
 }
