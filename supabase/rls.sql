@@ -22,6 +22,10 @@ alter table enterprise_settings enable row level security;
 alter table copilot_messages enable row level security;
 alter table copilot_actions enable row level security;
 alter table copilot_memories enable row level security;
+alter table processor_connections enable row level security;
+alter table processor_sync_runs enable row level security;
+alter table agent_presence enable row level security;
+alter table agent_activity_logs enable row level security;
 alter table agent_performance_summaries enable row level security;
 alter table notifications enable row level security;
 alter table notification_deliveries enable row level security;
@@ -714,6 +718,145 @@ drop policy if exists "admin deletes copilot memories" on copilot_memories;
 create policy "admin deletes copilot memories"
 on copilot_memories for delete
 using (is_admin());
+
+drop policy if exists "processor connections visible by owner manager or admin" on processor_connections;
+create policy "processor connections visible by owner manager or admin"
+on processor_connections for select
+using (
+  is_admin()
+  or agent_profile_id = current_profile_id()
+  or is_manager_for(agent_profile_id)
+);
+
+drop policy if exists "processor connections inserted by owner or admin" on processor_connections;
+create policy "processor connections inserted by owner or admin"
+on processor_connections for insert
+with check (
+  is_admin()
+  or agent_profile_id = current_profile_id()
+);
+
+drop policy if exists "processor connections updated by owner manager or admin" on processor_connections;
+create policy "processor connections updated by owner manager or admin"
+on processor_connections for update
+using (
+  is_admin()
+  or agent_profile_id = current_profile_id()
+  or is_manager_for(agent_profile_id)
+)
+with check (
+  is_admin()
+  or agent_profile_id = current_profile_id()
+  or is_manager_for(agent_profile_id)
+);
+
+drop policy if exists "admin deletes processor connections" on processor_connections;
+create policy "admin deletes processor connections"
+on processor_connections for delete
+using (is_admin());
+
+drop policy if exists "processor sync runs visible by connection access" on processor_sync_runs;
+create policy "processor sync runs visible by connection access"
+on processor_sync_runs for select
+using (
+  exists (
+    select 1
+    from processor_connections pc
+    where pc.id = processor_sync_runs.connection_id
+      and (
+        is_admin()
+        or pc.agent_profile_id = current_profile_id()
+        or is_manager_for(pc.agent_profile_id)
+      )
+  )
+);
+
+drop policy if exists "processor sync runs inserted by connection access" on processor_sync_runs;
+create policy "processor sync runs inserted by connection access"
+on processor_sync_runs for insert
+with check (
+  exists (
+    select 1
+    from processor_connections pc
+    where pc.id = processor_sync_runs.connection_id
+      and (
+        is_admin()
+        or pc.agent_profile_id = current_profile_id()
+        or is_manager_for(pc.agent_profile_id)
+      )
+  )
+);
+
+drop policy if exists "processor sync runs updated by connection access" on processor_sync_runs;
+create policy "processor sync runs updated by connection access"
+on processor_sync_runs for update
+using (
+  exists (
+    select 1
+    from processor_connections pc
+    where pc.id = processor_sync_runs.connection_id
+      and (
+        is_admin()
+        or pc.agent_profile_id = current_profile_id()
+        or is_manager_for(pc.agent_profile_id)
+      )
+  )
+)
+with check (
+  exists (
+    select 1
+    from processor_connections pc
+    where pc.id = processor_sync_runs.connection_id
+      and (
+        is_admin()
+        or pc.agent_profile_id = current_profile_id()
+        or is_manager_for(pc.agent_profile_id)
+      )
+  )
+);
+
+drop policy if exists "agent presence visible by owner manager or admin" on agent_presence;
+create policy "agent presence visible by owner manager or admin"
+on agent_presence for select
+using (
+  is_admin()
+  or profile_id = current_profile_id()
+  or is_manager_for(profile_id)
+);
+
+drop policy if exists "agents insert own presence" on agent_presence;
+create policy "agents insert own presence"
+on agent_presence for insert
+with check (profile_id = current_profile_id() or is_admin());
+
+drop policy if exists "agents update own presence" on agent_presence;
+create policy "agents update own presence"
+on agent_presence for update
+using (profile_id = current_profile_id() or is_admin())
+with check (profile_id = current_profile_id() or is_admin());
+
+drop policy if exists "agent activity visible by owner manager or admin" on agent_activity_logs;
+create policy "agent activity visible by owner manager or admin"
+on agent_activity_logs for select
+using (
+  is_admin()
+  or profile_id = current_profile_id()
+  or actor_profile_id = current_profile_id()
+  or is_manager_for(profile_id)
+);
+
+drop policy if exists "agent activity insert by authenticated" on agent_activity_logs;
+create policy "agent activity insert by authenticated"
+on agent_activity_logs for insert
+with check (
+  auth.uid() is not null
+  and (
+    is_admin()
+    or profile_id = current_profile_id()
+    or actor_profile_id = current_profile_id()
+    or (profile_id is null and actor_profile_id is null)
+  )
+);
 
 drop policy if exists "weekly summaries visible by agent or manager" on agent_performance_summaries;
 create policy "weekly summaries visible by agent or manager"

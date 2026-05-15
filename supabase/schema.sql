@@ -394,6 +394,62 @@ create table if not exists copilot_memories (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists processor_connections (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null,
+  display_name text not null,
+  account_identifier text not null,
+  agent_profile_id uuid not null references profiles(id) on delete cascade,
+  created_by uuid references profiles(id) on delete set null,
+  updated_by uuid references profiles(id) on delete set null,
+  auth_type text not null check (auth_type in ('oauth', 'api_key', 'merchant_credentials')),
+  status text not null default 'pending' check (status in ('pending', 'connected', 'error', 'disconnected', 'syncing')),
+  encrypted_credentials text,
+  metadata jsonb not null default '{}'::jsonb,
+  last_sync_at timestamptz,
+  last_tested_at timestamptz,
+  last_error text,
+  disconnected_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists processor_sync_runs (
+  id uuid primary key default gen_random_uuid(),
+  connection_id uuid not null references processor_connections(id) on delete cascade,
+  status text not null default 'queued' check (status in ('queued', 'running', 'success', 'error')),
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  records_processed integer not null default 0,
+  error_message text,
+  metadata jsonb not null default '{}'::jsonb
+);
+
+create table if not exists agent_presence (
+  profile_id uuid primary key references profiles(id) on delete cascade,
+  status text not null default 'offline' check (status in ('online', 'away', 'offline')),
+  last_seen_at timestamptz not null default now(),
+  current_path text,
+  user_agent text,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists agent_activity_logs (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid references profiles(id) on delete set null,
+  actor_profile_id uuid references profiles(id) on delete set null,
+  event_type text not null,
+  event_source text not null default 'app',
+  provider text,
+  connection_id uuid references processor_connections(id) on delete set null,
+  severity text not null default 'info' check (severity in ('info', 'warning', 'error', 'security')),
+  summary text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists agent_performance_summaries (
   id uuid primary key default gen_random_uuid(),
   agent_id uuid not null references agents(id) on delete cascade,
@@ -464,6 +520,13 @@ create index if not exists copilot_memories_scope_idx on copilot_memories (scope
 create index if not exists copilot_memories_entity_idx on copilot_memories (entity_id, updated_at desc);
 create unique index if not exists copilot_memories_seed_unique_idx on copilot_memories (scope, title, source_type)
 where source_type = 'seed';
+create index if not exists processor_connections_agent_idx on processor_connections (agent_profile_id, status, updated_at desc);
+create index if not exists processor_connections_provider_idx on processor_connections (provider, status, updated_at desc);
+create index if not exists processor_sync_runs_connection_idx on processor_sync_runs (connection_id, started_at desc);
+create index if not exists agent_presence_status_idx on agent_presence (status, last_seen_at desc);
+create index if not exists agent_activity_logs_profile_idx on agent_activity_logs (profile_id, created_at desc);
+create index if not exists agent_activity_logs_actor_idx on agent_activity_logs (actor_profile_id, created_at desc);
+create index if not exists agent_activity_logs_provider_idx on agent_activity_logs (provider, event_type, created_at desc);
 
 grant select, insert, update, delete on
   agent_recruits,
@@ -479,6 +542,13 @@ grant select, insert, update, delete on
   role_permissions,
   enterprise_settings,
   copilot_memories
+to authenticated;
+
+grant select, insert, update, delete on
+  processor_connections,
+  processor_sync_runs,
+  agent_presence,
+  agent_activity_logs
 to authenticated;
 
 create or replace function set_updated_at()
@@ -526,6 +596,14 @@ for each row execute function set_updated_at();
 
 drop trigger if exists copilot_memories_set_updated_at on copilot_memories;
 create trigger copilot_memories_set_updated_at before update on copilot_memories
+for each row execute function set_updated_at();
+
+drop trigger if exists processor_connections_set_updated_at on processor_connections;
+create trigger processor_connections_set_updated_at before update on processor_connections
+for each row execute function set_updated_at();
+
+drop trigger if exists agent_presence_set_updated_at on agent_presence;
+create trigger agent_presence_set_updated_at before update on agent_presence
 for each row execute function set_updated_at();
 
 create or replace function sync_deal_pricing_approval()
@@ -736,6 +814,7 @@ values
   ('copilot_learning_enabled', '{"enabled":true}'::jsonb, 'Allow Copilot to retain approved non-secret company knowledge from conversations and confirmed actions.'),
   ('copilot_model', '{"model":"gpt-5.4","reasoning":"medium"}'::jsonb, 'Default OpenAI model and reasoning profile used by MerchantDesk Copilot.'),
   ('copilot_memory_export_enabled', '{"enabled":true}'::jsonb, 'Allow admins to export retained Copilot memory for portability and vendor migration.'),
+  ('processor_sync_enabled', '{"enabled":true}'::jsonb, 'Allow encrypted processor/provider connections and sync runs.'),
   ('session_timeout_minutes', '{"minutes":60}'::jsonb, 'Target idle session timeout used for enterprise security policy.'),
   ('data_retention_years', '{"years":7}'::jsonb, 'Default business data retention window for operations and backup policies.')
 on conflict (setting_key) do nothing;

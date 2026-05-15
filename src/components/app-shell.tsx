@@ -58,7 +58,7 @@ const railItems: NavItem[] = [
   { label: "Data room", icon: Database, href: "/documents" },
   { label: "Tasks", icon: CalendarDays, href: "/tasks" },
   { label: "Copilot", icon: Send, href: "/copilot" },
-  { label: "Settings", icon: Settings, href: "/settings" },
+  { label: "Settings", icon: Settings, href: "/settings", permissionKey: "processor_connections.manage" },
 ];
 
 const headerIconClassName =

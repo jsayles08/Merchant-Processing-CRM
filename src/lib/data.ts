@@ -2,8 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { demoData } from "@/lib/demo-data";
 import type {
   Agent,
+  AgentActivityLog,
   AgentOnboardingRecord,
   AgentOnboardingStep,
+  AgentPresence,
   AgentRecruit,
   AgentRecruitUpdate,
   AuditLog,
@@ -19,6 +21,8 @@ import type {
   MerchantOnboardingStep,
   MerchantUpdate,
   Profile,
+  ProcessorConnection,
+  ProcessorSyncRun,
   Residual,
   ResidualImportBatch,
   RolePermission,
@@ -66,6 +70,10 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     rolePermissions,
     enterpriseSettings,
     copilotMemories,
+    processorConnections,
+    processorSyncRuns,
+    agentPresence,
+    agentActivityLogs,
     auditLogs,
   ] = await Promise.all([
     selectAll<Profile>(supabase, "profiles", "created_at"),
@@ -90,6 +98,10 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     selectOptionalAll<RolePermission>(supabase, "role_permissions", "updated_at", false),
     selectOptionalAll<EnterpriseSetting>(supabase, "enterprise_settings", "updated_at", false),
     selectOptionalAll<CopilotMemory>(supabase, "copilot_memories", "updated_at", false),
+    selectOptionalAll<ProcessorConnection>(supabase, "processor_connections", "updated_at", false),
+    selectOptionalAll<ProcessorSyncRun>(supabase, "processor_sync_runs", "started_at", false),
+    selectOptionalAll<AgentPresence>(supabase, "agent_presence", "last_seen_at", false),
+    selectOptionalAll<AgentActivityLog>(supabase, "agent_activity_logs", "created_at", false),
     selectOptionalAll<AuditLog>(supabase, "audit_logs", "created_at", false),
   ]);
 
@@ -116,6 +128,10 @@ export async function getCrmData(supabase: SupabaseClient): Promise<CrmData> {
     rolePermissions: hydrateRolePermissions(rolePermissions),
     enterpriseSettings: hydrateEnterpriseSettings(enterpriseSettings),
     copilotMemories,
+    processorConnections,
+    processorSyncRuns,
+    agentPresence,
+    agentActivityLogs,
     auditLogs,
   };
 }

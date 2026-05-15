@@ -27,8 +27,10 @@ export type PermissionKey =
   | "messages.view"
   | "notifications.view"
   | "settings.view"
+  | "processor_connections.manage"
   | "settings.manage_users"
   | "settings.manage_access"
+  | "system_activity.view"
   | "audit_logs.view"
   | "api.integrations"
   | "data.export";
@@ -69,9 +71,11 @@ export const permissionCatalog: PermissionCatalogItem[] = [
   { key: "copilot.confirm_actions", label: "Confirm Copilot actions", description: "Approve Copilot-suggested CRM writes.", category: "Documents & AI" },
   { key: "messages.view", label: "Messages", description: "View Copilot/message history.", category: "Core CRM", navHref: "/messages" },
   { key: "notifications.view", label: "Notifications", description: "View CRM notifications and delivery logs.", category: "Core CRM", navHref: "/notifications" },
-  { key: "settings.view", label: "Settings", description: "Open enterprise settings workspace.", category: "Administration", navHref: "/settings", critical: true, adminOnly: true },
+  { key: "settings.view", label: "Settings", description: "Open personal and enterprise settings workspace.", category: "Administration", navHref: "/settings", critical: true },
+  { key: "processor_connections.manage", label: "Processor connections", description: "Connect and sync processor/provider accounts for assigned books.", category: "Administration" },
   { key: "settings.manage_users", label: "Manage users", description: "Create users, assign managers, and reassign books.", category: "Administration", adminOnly: true },
   { key: "settings.manage_access", label: "Manage access", description: "Change role permissions and enterprise policy controls.", category: "Administration", critical: true, adminOnly: true },
+  { key: "system_activity.view", label: "System activity", description: "View agent presence, provider connection status, sync events, and system errors.", category: "Administration", adminOnly: true },
   { key: "audit_logs.view", label: "Audit logs", description: "View sensitive action audit history.", category: "Administration" },
   { key: "api.integrations", label: "API integrations", description: "Allow external API integrations and API key access.", category: "Administration", adminOnly: true },
   { key: "data.export", label: "Data export", description: "Export CSVs and operational data.", category: "Administration" },
@@ -106,9 +110,11 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "copilot.confirm_actions": true,
     "messages.view": true,
     "notifications.view": true,
-    "settings.view": false,
+    "settings.view": true,
+    "processor_connections.manage": true,
     "settings.manage_users": false,
     "settings.manage_access": false,
+    "system_activity.view": false,
     "audit_logs.view": false,
     "api.integrations": false,
     "data.export": true,
@@ -139,9 +145,11 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "copilot.confirm_actions": true,
     "messages.view": true,
     "notifications.view": true,
-    "settings.view": false,
+    "settings.view": true,
+    "processor_connections.manage": true,
     "settings.manage_users": false,
     "settings.manage_access": false,
+    "system_activity.view": false,
     "audit_logs.view": true,
     "api.integrations": false,
     "data.export": true,
@@ -175,6 +183,13 @@ export const enterpriseSettingDefaults: EnterpriseSetting[] = [
     setting_key: "api_access_enabled",
     setting_value: { enabled: false },
     description: "Allow external API integrations using MerchantDesk API keys.",
+    updated_by: null,
+    updated_at: new Date(0).toISOString(),
+  },
+  {
+    setting_key: "processor_sync_enabled",
+    setting_value: { enabled: true },
+    description: "Allow encrypted processor/provider account connections and manual sync runs.",
     updated_by: null,
     updated_at: new Date(0).toISOString(),
   },

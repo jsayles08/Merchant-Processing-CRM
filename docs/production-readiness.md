@@ -13,6 +13,7 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
   - `OPENAI_MODEL`
   - `CRON_SECRET`
   - `MERCHANTDESK_API_KEY`
+  - `INTEGRATION_ENCRYPTION_KEY`
   - `NEXT_PUBLIC_APP_URL`
   - `NEXT_PUBLIC_COMPANY_NAME`
   - `NEXT_PUBLIC_PRODUCT_NAME`
@@ -20,6 +21,7 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
   - `NEXT_PUBLIC_SUPPORT_EMAIL`
 - Confirm `/api/health` returns `200` in production.
 - Confirm `/api/health` reports `environment.merchantDeskApiKey = true` before connecting outside lead forms, dialers, or reporting tools.
+- Confirm `/api/health` reports `environment.integrationEncryptionKey = true` before agents store processor/provider credentials.
 - Confirm `/api/health` reports `documents.publicUrlDocuments = 0`; any higher value means existing rows still point to old public URLs instead of private Supabase storage paths.
 - Configure Supabase Auth email templates and redirect URLs:
   - `https://your-domain.com/auth/callback`
@@ -33,10 +35,13 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
 - Optional notification providers:
   - Resend: `RESEND_API_KEY`, `NOTIFICATION_EMAIL_FROM`
   - Twilio: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
+- Optional processor OAuth providers:
+  - Fiserv/CardConnect: `FISERV_OAUTH_AUTHORIZATION_URL`, `FISERV_OAUTH_CLIENT_ID`, `FISERV_OAUTH_CLIENT_SECRET`, `FISERV_OAUTH_REDIRECT_URI`, `FISERV_OAUTH_SCOPE`
+  - Nuvei: `NUVEI_OAUTH_AUTHORIZATION_URL`, `NUVEI_OAUTH_CLIENT_ID`, `NUVEI_OAUTH_CLIENT_SECRET`, `NUVEI_OAUTH_REDIRECT_URI`
 
 ## Next Product Work
 
-- Apply the latest `supabase/schema.sql` and `supabase/rls.sql` updates in Supabase before using audit logs, residual imports, reminder delivery logs, or document migration status.
+- Apply the latest `supabase/schema.sql` and `supabase/rls.sql` updates in Supabase before using audit logs, residual imports, reminder delivery logs, processor connections, presence, or document migration status.
 - Add provider-specific email/SMS templates once Resend and Twilio production credentials are active.
 - Expand tests from compensation/import parsing into authenticated server action integration tests against a seeded Supabase test project.
 - Add external error monitoring and uptime checks.
@@ -45,9 +50,11 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
 ## Observability
 
 - Use Vercel Runtime Logs for `/api/health`, `/api/jobs/weekly-summary`, `/api/jobs/follow-up-reminders`, and Copilot routes.
+- Use the Settings activity monitor for `agent_activity_logs`, `agent_presence`, provider connection status, and processor sync failures.
 - Use Vercel Runtime Logs for `/api/merchants` and `/api/tasks` after connecting outside systems; failed calls should return JSON with `401`, `400`, `404`, `500`, or `503`.
 - Keep `/api/health` in uptime monitoring; it verifies Supabase admin connectivity and reports document storage migration counts.
 - Track `audit_logs` for sensitive business actions and `notification_deliveries` for reminder delivery outcomes.
+- Track `processor_sync_runs` after provider syncs and investigate any `error_message` values before trusting imported processor data.
 - Review `residual_import_batches` after every processor import for rejected rows or mismatched merchant names.
 - Current `npm audit` reports a moderate PostCSS advisory through Next's bundled dependency. Do not force the suggested major downgrade; monitor Next releases and upgrade when the fix is available in the current supported line.
 
@@ -55,6 +62,7 @@ This checklist tracks the next work needed to operate MerchantDesk as a platform
 
 - Never commit `.env.local`.
 - Service role key must only run on the server.
+- `INTEGRATION_ENCRYPTION_KEY` must be stable and backed up securely; rotating it requires re-encrypting stored processor credentials.
 - `MERCHANTDESK_API_KEY` must only be shared with trusted server-side integrations and rotated if a vendor connection changes.
 - Agents should not be given admin role in Supabase.
 - Rotate credentials immediately when staff leave or secrets may have been exposed.

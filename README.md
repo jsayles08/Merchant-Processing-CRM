@@ -27,6 +27,8 @@ Production-minded merchant processing CRM for agents, managers, and admins to ma
 - Weekly performance summary job endpoint and database function
 - Daily follow-up reminder job with in-app notifications plus optional Resend and Twilio delivery logs
 - Keyed integration APIs for merchant creation/listing and task creation/listing
+- Encrypted processor/provider connections for Fiserv, Nuvei, and future adapters
+- Agent presence heartbeat, login/logout activity logs, sync history, and admin activity monitoring
 - Audit log foundation for merchant edits, pricing approvals, user creation, residual imports, reassignment, and Copilot confirmations
 - Manager assignment, bulk merchant reassignment, and processor residual CSV import workflows
 - Production health endpoint at `/api/health`
@@ -57,6 +59,16 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.2
 CRON_SECRET=
 MERCHANTDESK_API_KEY=
+INTEGRATION_ENCRYPTION_KEY=
+FISERV_OAUTH_AUTHORIZATION_URL=
+FISERV_OAUTH_CLIENT_ID=
+FISERV_OAUTH_CLIENT_SECRET=
+FISERV_OAUTH_REDIRECT_URI=
+FISERV_OAUTH_SCOPE=
+NUVEI_OAUTH_AUTHORIZATION_URL=
+NUVEI_OAUTH_CLIENT_ID=
+NUVEI_OAUTH_CLIENT_SECRET=
+NUVEI_OAUTH_REDIRECT_URI=
 NEXT_PUBLIC_APP_URL=
 NEXT_PUBLIC_COMPANY_NAME=
 NEXT_PUBLIC_PRODUCT_NAME=
@@ -69,7 +81,7 @@ TWILIO_AUTH_TOKEN=
 TWILIO_FROM_NUMBER=
 ```
 
-`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `MERCHANTDESK_API_KEY`, `RESEND_API_KEY`, and Twilio credentials are server-only and must never be exposed in client components.
+`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `MERCHANTDESK_API_KEY`, `INTEGRATION_ENCRYPTION_KEY`, provider OAuth secrets, `RESEND_API_KEY`, and Twilio credentials are server-only and must never be exposed in client components.
 
 ## Supabase Setup
 
@@ -87,6 +99,7 @@ The schema includes:
 - `residuals`, `teams`, `team_members`, `compensation_rules`
 - `copilot_messages`, `copilot_actions`
 - `agent_performance_summaries`, `notifications`, `notification_deliveries`
+- `processor_connections`, `processor_sync_runs`, `agent_presence`, `agent_activity_logs`
 - `audit_logs`, `residual_import_batches`
 - private Supabase Storage bucket `merchant-documents` with signed document links
 
@@ -152,6 +165,27 @@ POST /api/tasks
 `POST /api/merchants` accepts `assigned_agent_id` or `assigned_agent_email`. Successful merchant creation also creates the deal record, notifies the assigned agent, and writes an audit log.
 
 `POST /api/tasks` accepts `assigned_to` or `assigned_to_email`. Successful task creation creates the assignee notification and writes an audit log.
+
+## Processor Connections
+
+Agents can connect processor accounts in `/settings`. Secrets are encrypted with `INTEGRATION_ENCRYPTION_KEY` before storage in `processor_connections.encrypted_credentials`; UI and logs only receive metadata.
+
+Provider routes:
+
+```bash
+GET /api/integrations/providers
+GET /api/integrations/connections
+POST /api/integrations/connections
+POST /api/integrations/connections/:id/test
+POST /api/integrations/connections/:id/sync
+POST /api/integrations/connections/:id/disconnect
+GET /api/integrations/oauth/:provider/start
+GET /api/integrations/oauth/:provider/callback
+GET /api/activity/status
+POST /api/activity/heartbeat
+```
+
+Fiserv/CardConnect OAuth uses `FISERV_OAUTH_CLIENT_ID`, `FISERV_OAUTH_CLIENT_SECRET`, and `FISERV_OAUTH_REDIRECT_URI` once the production client is issued. Until then, the adapter validates encrypted credentials and records sync runs through the provider abstraction.
 
 ## Weekly Summary Job
 

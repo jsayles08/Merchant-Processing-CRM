@@ -14,6 +14,10 @@ export function isMerchantDeskApiConfigured() {
   return Boolean(process.env.MERCHANTDESK_API_KEY);
 }
 
+export function isIntegrationEncryptionConfigured() {
+  return Boolean(process.env.INTEGRATION_ENCRYPTION_KEY);
+}
+
 export function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
@@ -27,5 +31,8 @@ export function getEnvironmentReport() {
     openaiApiKey: isOpenAIConfigured(),
     cronSecret: Boolean(process.env.CRON_SECRET),
     merchantDeskApiKey: isMerchantDeskApiConfigured(),
+    integrationEncryptionKey: isIntegrationEncryptionConfigured(),
+    fiservOAuth: Boolean(process.env.FISERV_OAUTH_CLIENT_ID && process.env.FISERV_OAUTH_REDIRECT_URI),
+    nuveiOAuth: Boolean(process.env.NUVEI_OAUTH_CLIENT_ID && process.env.NUVEI_OAUTH_REDIRECT_URI),
   };
 }

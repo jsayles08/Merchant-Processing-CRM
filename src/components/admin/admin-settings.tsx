@@ -415,6 +415,12 @@ export function AdminSettings({ data, currentProfile }: { data: CrmData; current
               onChange={(checked) => updateEnterpriseSetting("api_access_enabled", "enabled", checked)}
             />
             <EnterpriseToggle
+              label="Enable processor sync"
+              description={settingDescription(hydratedEnterpriseSettings, "processor_sync_enabled")}
+              checked={Boolean(enterpriseDraft.processor_sync_enabled?.enabled)}
+              onChange={(checked) => updateEnterpriseSetting("processor_sync_enabled", "enabled", checked)}
+            />
+            <EnterpriseToggle
               label="Copilot company learning"
               description={settingDescription(hydratedEnterpriseSettings, "copilot_learning_enabled")}
               checked={Boolean(enterpriseDraft.copilot_learning_enabled?.enabled)}

@@ -42,6 +42,12 @@ export type MerchantOnboardingStatus =
   | "declined";
 export type SignatureStatus = "draft" | "sent" | "viewed" | "signed" | "declined" | "expired";
 export type SignatureEntityType = "agent" | "recruit" | "merchant" | "account";
+export type ProcessorProviderId = "fiserv" | "nuvei" | "other";
+export type ProcessorAuthType = "oauth" | "api_key" | "merchant_credentials";
+export type ProcessorConnectionStatus = "pending" | "connected" | "error" | "disconnected" | "syncing";
+export type ProcessorSyncStatus = "queued" | "running" | "success" | "error";
+export type PresenceStatus = "online" | "away" | "offline";
+export type ActivitySeverity = "info" | "warning" | "error" | "security";
 
 export type Profile = {
   id: string;
@@ -327,6 +333,61 @@ export type CopilotMemory = {
   updated_at: string;
 };
 
+export type ProcessorConnection = {
+  id: string;
+  provider: ProcessorProviderId | string;
+  display_name: string;
+  account_identifier: string;
+  agent_profile_id: string;
+  created_by: string | null;
+  updated_by: string | null;
+  auth_type: ProcessorAuthType;
+  status: ProcessorConnectionStatus;
+  metadata: Record<string, unknown>;
+  last_sync_at: string | null;
+  last_tested_at: string | null;
+  last_error: string | null;
+  disconnected_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProcessorSyncRun = {
+  id: string;
+  connection_id: string;
+  status: ProcessorSyncStatus;
+  started_at: string;
+  finished_at: string | null;
+  records_processed: number;
+  error_message: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type AgentPresence = {
+  profile_id: string;
+  status: PresenceStatus;
+  last_seen_at: string;
+  current_path: string | null;
+  user_agent: string | null;
+  updated_at: string;
+};
+
+export type AgentActivityLog = {
+  id: string;
+  profile_id: string | null;
+  actor_profile_id: string | null;
+  event_type: string;
+  event_source: string;
+  provider: string | null;
+  connection_id: string | null;
+  severity: ActivitySeverity;
+  summary: string;
+  metadata: Record<string, unknown>;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
+
 export type CrmData = {
   profiles: Profile[];
   agents: Agent[];
@@ -350,6 +411,10 @@ export type CrmData = {
   rolePermissions: RolePermission[];
   enterpriseSettings: EnterpriseSetting[];
   copilotMemories: CopilotMemory[];
+  processorConnections: ProcessorConnection[];
+  processorSyncRuns: ProcessorSyncRun[];
+  agentPresence: AgentPresence[];
+  agentActivityLogs: AgentActivityLog[];
   auditLogs: AuditLog[];
 };
 

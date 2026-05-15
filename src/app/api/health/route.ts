@@ -21,6 +21,12 @@ export async function GET() {
       privatePathDocuments: 0,
       totalDocuments: 0,
     },
+    integrations: {
+      ok: environment.integrationEncryptionKey,
+      message: environment.integrationEncryptionKey
+        ? "Processor credential encryption is configured."
+        : "INTEGRATION_ENCRYPTION_KEY is missing; processor credentials cannot be stored.",
+    },
   };
 
   if (isSupabaseAdminConfigured()) {
