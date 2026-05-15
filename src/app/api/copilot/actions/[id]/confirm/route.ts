@@ -152,10 +152,47 @@ export async function POST(
       agent_id: actionAgentId,
       update_type: updateType,
       note,
+      next_follow_up_date: parseDueDate(payload.next_follow_up_date),
     });
 
     if (update.error) throw update.error;
     completionMessage = "Merchant update added.";
+    completed = true;
+  }
+
+  if (action.action_type === "update_merchant_profile" && merchantId) {
+    const merchantPatch: Record<string, unknown> = {};
+    if (typeof payload.business_name === "string" && payload.business_name.trim()) merchantPatch.business_name = payload.business_name.trim();
+    if (typeof payload.contact_name === "string" && payload.contact_name.trim()) merchantPatch.contact_name = payload.contact_name.trim();
+    if (typeof payload.contact_email === "string" && payload.contact_email.trim()) merchantPatch.contact_email = payload.contact_email.trim();
+    if (typeof payload.contact_phone === "string" && payload.contact_phone.trim()) merchantPatch.contact_phone = payload.contact_phone.trim();
+    if (typeof payload.industry === "string" && payload.industry.trim()) merchantPatch.industry = payload.industry.trim();
+    if (typeof payload.current_processor === "string" && payload.current_processor.trim()) merchantPatch.current_processor = payload.current_processor.trim();
+    if (typeof payload.monthly_volume_estimate === "number") merchantPatch.monthly_volume_estimate = payload.monthly_volume_estimate;
+    if (typeof payload.average_ticket === "number") merchantPatch.average_ticket = payload.average_ticket;
+    if (typeof payload.proposed_rate === "number") merchantPatch.proposed_rate = payload.proposed_rate;
+    if (typeof payload.notes === "string" && payload.notes.trim()) merchantPatch.notes = payload.notes.trim();
+
+    if (!Object.keys(merchantPatch).length) {
+      return NextResponse.json({ ok: false, message: "No merchant profile fields were provided to update." }, { status: 400 });
+    }
+
+    const merchantUpdate = await supabase.from("merchants").update(merchantPatch).eq("id", merchantId);
+    if (merchantUpdate.error) throw merchantUpdate.error;
+
+    const dealPatch: Record<string, unknown> = {};
+    if (typeof payload.monthly_volume_estimate === "number") {
+      dealPatch.estimated_monthly_volume = payload.monthly_volume_estimate;
+    }
+    if (typeof payload.proposed_rate === "number") {
+      dealPatch.proposed_rate = payload.proposed_rate;
+    }
+    if (Object.keys(dealPatch).length) {
+      const dealUpdate = await supabase.from("deals").update(dealPatch).eq("merchant_id", merchantId);
+      if (dealUpdate.error) throw dealUpdate.error;
+    }
+
+    completionMessage = "Merchant profile updated.";
     completed = true;
   }
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, ChevronDown, MessageCircle, Minus, Send, X } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Bot, ChevronDown, ExternalLink, MessageCircle, Minus, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
 
@@ -9,6 +11,7 @@ type WidgetMessage = {
   id: string;
   role: "assistant" | "user";
   content: string;
+  actionCount?: number;
 };
 
 const initialMessages: WidgetMessage[] = [
@@ -20,11 +23,16 @@ const initialMessages: WidgetMessage[] = [
 ];
 
 export function GlobalCopilotWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<WidgetMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  if (pathname?.startsWith("/copilot") || pathname?.startsWith("/login") || pathname?.startsWith("/setup") || pathname?.startsWith("/reset-password")) {
+    return null;
+  }
 
   async function sendMessage() {
     const trimmed = input.trim();
@@ -41,7 +49,7 @@ export function GlobalCopilotWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, merchantId: null }),
       });
-      const payload = (await response.json().catch(() => ({}))) as { content?: string; message?: string };
+      const payload = (await response.json().catch(() => ({}))) as { content?: string; message?: string; actions?: unknown[] };
 
       if (!response.ok) {
         throw new Error(payload.message ?? "Copilot is available after sign in.");
@@ -53,10 +61,10 @@ export function GlobalCopilotWidget() {
           id: crypto.randomUUID(),
           role: "assistant",
           content: payload.content ?? "I processed that request.",
+          actionCount: payload.actions?.length ?? 0,
         },
       ]);
     } catch (error) {
-      // TODO: Connect anonymous website visitors to a dedicated support AI route when public chat is enabled.
       setMessages((current) => [
         ...current,
         {
@@ -110,6 +118,14 @@ export function GlobalCopilotWidget() {
           <ChevronDown className={`h-4 w-4 text-[#25425E] transition ${isMinimized ? "" : "rotate-180"}`} />
         </button>
         <div className="flex items-center gap-1">
+          <Link
+            href="/copilot"
+            aria-label="Open full Copilot workspace"
+            title="Open full Copilot workspace"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-[#25425E] hover:bg-white"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Link>
           <button
             type="button"
             aria-label="Minimize Copilot"
@@ -140,10 +156,20 @@ export function GlobalCopilotWidget() {
                   }`}
                 >
                   {message.content}
+                  {message.actionCount ? (
+                    <span className="mt-2 block text-xs font-black uppercase tracking-wide opacity-75">
+                      {message.actionCount} action{message.actionCount === 1 ? "" : "s"} drafted
+                    </span>
+                  ) : null}
                 </div>
               </div>
             ))}
-            {isLoading ? <p className="text-sm font-semibold text-[#25425E]/65">Copilot is typing...</p> : null}
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#25425E]/65">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-[#0E5EC9]" />
+                Copilot is checking CRM context...
+              </div>
+            ) : null}
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Textarea

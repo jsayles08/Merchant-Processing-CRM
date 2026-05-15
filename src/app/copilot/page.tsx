@@ -7,11 +7,12 @@ export default async function CopilotPage({
 }: {
   searchParams?: Promise<{ merchant?: string }>;
 }) {
-  const { supabase, profile, data } = await getCrmPageContext("copilot.use");
+  const { supabase, profile, user, data } = await getCrmPageContext("copilot.use");
   const params = await searchParams;
   const { data: copilotMessages } = await supabase
     .from("copilot_messages")
     .select("*")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: true })
     .limit(20);
 

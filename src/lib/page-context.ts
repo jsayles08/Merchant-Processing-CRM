@@ -4,7 +4,7 @@ import { getCrmData } from "@/lib/data";
 import { hasPermission, type PermissionKey } from "@/lib/permissions";
 
 export async function getCrmPageContext(requiredPermission?: PermissionKey) {
-  const { supabase, profile } = await getSessionContext();
+  const { supabase, profile, user } = await getSessionContext();
   const data = await getCrmData(supabase);
   const currentAgent = data.agents.find((agent) => agent.profile_id === profile.id) ?? data.agents[0];
 
@@ -15,6 +15,7 @@ export async function getCrmPageContext(requiredPermission?: PermissionKey) {
   return {
     supabase,
     profile,
+    user,
     data,
     currentAgent,
     currentAgentId: currentAgent?.id ?? "",

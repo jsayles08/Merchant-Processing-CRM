@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  AlertTriangle,
   CalendarDays,
   ClipboardList,
   Edit3,
@@ -41,6 +42,14 @@ type MenuItem = {
   href?: string;
   onSelect?: () => void;
   disabled?: boolean;
+};
+
+type PortfolioAlert = {
+  title: string;
+  helper: string;
+  href: string;
+  merchantId?: string;
+  tone: "blue" | "amber" | "rose" | "slate";
 };
 
 const dealPalettes = [
@@ -132,6 +141,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
   const pendingApprovals = data.deals.filter((deal) => deal.approval_status === "pending").length;
   const underwritingCount = data.merchants.filter((merchant) => merchant.status === "underwriting").length;
   const processorImportIssues = data.residualImportBatches.reduce((sum, batch) => sum + batch.error_count, 0);
+  const portfolioAlerts = useMemo(() => buildPortfolioAlerts(data), [data]);
 
   const stageRows = pipelineStages
     .map((stage) => {
@@ -280,6 +290,11 @@ export function DashboardOverview({ data }: { data: CrmData }) {
           underwritingCount={underwritingCount}
           documentCount={data.documents.length}
           processorImportIssues={processorImportIssues}
+        />
+
+        <RiskAlertStrip
+          alerts={portfolioAlerts}
+          onSelectMerchant={(merchantId, message) => selectMerchant(merchantId, message)}
         />
 
         <Panel
@@ -563,6 +578,65 @@ export function DashboardOverview({ data }: { data: CrmData }) {
         <DetailCard merchant={selectedMerchant} agentName={selectedProfile?.full_name ?? "Unassigned"} />
       </aside>
     </section>
+  );
+}
+
+function RiskAlertStrip({
+  alerts,
+  onSelectMerchant,
+}: {
+  alerts: PortfolioAlert[];
+  onSelectMerchant: (merchantId: string, message: string) => void;
+}) {
+  if (!alerts.length) {
+    return (
+      <div className="crm-panel rounded-[28px] p-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0E5EC9]/10 text-[#0E5EC9]">
+            <ShieldCheck className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="text-sm font-black text-[#0B0F15]">Portfolio monitoring clear</p>
+            <p className="text-sm text-[#25425E]/70">No pricing, underwriting, signature, residual import, or overdue-task alerts are currently visible.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {alerts.map((alert) => {
+        const content = (
+          <>
+            <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-full ${alertToneClass(alert.tone)}`}>
+              <AlertTriangle className="h-4 w-4" />
+            </div>
+            <p className="text-sm font-black text-[#0B0F15]">{alert.title}</p>
+            <p className="mt-1 text-sm leading-5 text-[#25425E]/70">{alert.helper}</p>
+          </>
+        );
+
+        if (alert.merchantId) {
+          return (
+            <Link
+              key={`${alert.title}-${alert.merchantId}`}
+              href={alert.href}
+              className="crm-card rounded-[26px] p-4 transition hover:-translate-y-0.5"
+              onClick={() => onSelectMerchant(alert.merchantId!, alert.title)}
+            >
+              {content}
+            </Link>
+          );
+        }
+
+        return (
+          <Link key={alert.title} href={alert.href} className="crm-card rounded-[26px] p-4 transition hover:-translate-y-0.5">
+            {content}
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
@@ -973,4 +1047,102 @@ function formatLocalDate(year: number, monthIndex: number, day: number) {
   const month = `${monthIndex + 1}`.padStart(2, "0");
   const date = `${day}`.padStart(2, "0");
   return `${year}-${month}-${date}`;
+}
+
+function buildPortfolioAlerts(data: CrmData): PortfolioAlert[] {
+  const alerts: PortfolioAlert[] = [];
+  const now = Date.now();
+
+  for (const deal of data.deals.filter((item) => item.approval_status === "pending").slice(0, 2)) {
+    const merchant = data.merchants.find((item) => item.id === deal.merchant_id);
+    alerts.push({
+      title: "Pricing approval needed",
+      helper: `${merchant?.business_name ?? "Merchant"} is below pricing floor at ${deal.proposed_rate}%.`,
+      href: "/opportunities#approval-requests",
+      merchantId: merchant?.id,
+      tone: "amber",
+    });
+  }
+
+  for (const merchant of data.merchants.filter((item) => item.status === "underwriting").slice(0, 2)) {
+    const docs = data.documents.filter((document) => document.merchant_id === merchant.id);
+    if (docs.length < 2) {
+      alerts.push({
+        title: "Underwriting docs thin",
+        helper: `${merchant.business_name} has ${docs.length} document${docs.length === 1 ? "" : "s"} attached. Verify statements, owner ID, and voided check.`,
+        href: `/merchants/${merchant.id}`,
+        merchantId: merchant.id,
+        tone: "blue",
+      });
+    }
+  }
+
+  const overdueTask = data.tasks
+    .filter((task) => task.status !== "completed" && new Date(task.due_date).getTime() < now)
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
+  if (overdueTask) {
+    const merchant = overdueTask.merchant_id ? data.merchants.find((item) => item.id === overdueTask.merchant_id) : null;
+    alerts.push({
+      title: "Overdue follow-up",
+      helper: `${overdueTask.title} was due ${new Date(overdueTask.due_date).toLocaleDateString()}${merchant ? ` for ${merchant.business_name}` : ""}.`,
+      href: overdueTask.merchant_id ? `/tasks?merchant=${overdueTask.merchant_id}` : "/tasks",
+      merchantId: overdueTask.merchant_id ?? undefined,
+      tone: "rose",
+    });
+  }
+
+  const unsigned = data.signatureRequests.find((request) => !["signed", "declined", "expired"].includes(request.status));
+  if (unsigned) {
+    alerts.push({
+      title: "Signature still open",
+      helper: `${unsigned.title} is ${unsigned.status} for ${unsigned.recipient_name}.`,
+      href: "/documents",
+      merchantId: unsigned.related_entity_type === "merchant" ? unsigned.related_entity_id ?? undefined : undefined,
+      tone: "slate",
+    });
+  }
+
+  const importIssue = data.residualImportBatches.find((batch) => batch.error_count > 0);
+  if (importIssue) {
+    alerts.push({
+      title: "Residual import exceptions",
+      helper: `${importIssue.error_count} row${importIssue.error_count === 1 ? "" : "s"} need review from ${importIssue.processor_name}.`,
+      href: "/reports",
+      tone: "rose",
+    });
+  }
+
+  const residualVariance = findResidualVarianceAlert(data);
+  if (residualVariance) alerts.push(residualVariance);
+
+  return alerts.slice(0, 4);
+}
+
+function findResidualVarianceAlert(data: CrmData): PortfolioAlert | null {
+  for (const merchant of data.merchants.filter((item) => item.status === "processing")) {
+    const latestResidual = data.residuals
+      .filter((residual) => residual.merchant_id === merchant.id)
+      .sort((a, b) => new Date(b.month).getTime() - new Date(a.month).getTime())[0];
+    if (!latestResidual || !merchant.monthly_volume_estimate) continue;
+
+    const variance = latestResidual.processing_volume / merchant.monthly_volume_estimate;
+    if (variance < 0.7 || variance > 1.3) {
+      return {
+        title: "Volume variance watch",
+        helper: `${merchant.business_name} processed ${currency(latestResidual.processing_volume)} vs ${currency(merchant.monthly_volume_estimate)} expected.`,
+        href: `/merchants/${merchant.id}`,
+        merchantId: merchant.id,
+        tone: variance < 0.7 ? "rose" : "amber",
+      };
+    }
+  }
+
+  return null;
+}
+
+function alertToneClass(tone: PortfolioAlert["tone"]) {
+  if (tone === "blue") return "bg-[#0E5EC9] text-white";
+  if (tone === "amber") return "bg-[#E9D7A1] text-[#0B0F15]";
+  if (tone === "rose") return "bg-[#D57D25] text-white";
+  return "bg-[#25425E] text-white";
 }

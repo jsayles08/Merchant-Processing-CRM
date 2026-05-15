@@ -22,6 +22,7 @@ export type CopilotStructuredResponse = {
   content: string;
   actions: CopilotActionDraft[];
   memories: CopilotMemoryDraft[];
+  suggestions: string[];
 };
 
 export const copilotModel = process.env.OPENAI_MODEL ?? "gpt-5.4";
@@ -30,6 +31,7 @@ const actionCatalog = [
   "create_merchant",
   "update_stage",
   "add_merchant_update",
+  "update_merchant_profile",
   "create_task",
   "create_recruit",
   "create_merchant_onboarding",
@@ -42,11 +44,14 @@ const actionCatalog = [
 export function buildCopilotSystemPrompt(profile: Profile) {
   return [
     `You are ${brand.companyName} Copilot, an enterprise AI teammate for a merchant processing CRM.`,
-    "You help agents, managers, and admins operate the CRM, coach sales work, prepare underwriting handoffs, and turn plain English into confirmed CRM actions.",
-    "Use company memory when available. Learn durable company facts, preferred processes, sales language, approval rules, processor notes, onboarding practices, and playbooks.",
+    "You help agents, managers, and admins operate the CRM, coach sales work, prepare underwriting handoffs, recruit agents, manage residuals, and turn plain English into confirmed CRM actions.",
+    "Be closer to a strong ChatGPT operator than a rules bot: infer intent, use context, explain tradeoffs briefly, and propose the smallest useful next action.",
+    "Use company memory when available. Learn durable company facts, preferred processes, sales language, approval rules, processor notes, onboarding practices, risk rules, and playbooks.",
     "Do not memorize secrets, private keys, full card data, bank account data, passwords, or one-time credentials. If the user provides those, warn them and do not add them to memory.",
     "Major CRM writes must be returned as actions with requires_confirmation=true. Never claim a write happened until the user confirms the action.",
-    "Prefer concrete next steps, missing-field checks, and short operational language. Be professional, direct, and useful.",
+    "For vague asks, answer usefully first, then ask one clarifying question only if the CRM task cannot be completed safely without it.",
+    "Do not reply with generic phrases like 'I parsed the update' unless you also provide specific CRM observations and next steps.",
+    "Prefer concrete next steps, missing-field checks, risk/underwriting notes, and short operational language. Be professional, direct, and useful.",
     `Current user: ${profile.full_name} (${profile.role}).`,
     `Supported action_type values: ${actionCatalog.join(", ")}.`,
   ].join("\n");
@@ -62,15 +67,23 @@ export function buildCopilotContext(params: {
   const openTasks = data.tasks.filter((task) => task.status !== "completed").slice(0, 12);
   const activeDeals = data.deals.filter((deal) => !["processing", "lost", "inactive"].includes(deal.stage)).slice(0, 15);
   const recentUpdates = data.merchantUpdates.slice(0, 15);
+  const staleMerchants = buildStaleMerchantSignals(data);
 
   return JSON.stringify(
     {
+      today: new Date().toISOString(),
       company: {
         product: brand.productName,
         companyName: brand.companyName,
         supportEmail: brand.supportEmail,
       },
       selectedMerchant: selectedMerchant ? summarizeMerchant(selectedMerchant, data.tasks) : null,
+      portfolioSignals: {
+        openTaskCount: data.tasks.filter((task) => task.status !== "completed").length,
+        pendingPricingApprovals: data.deals.filter((deal) => deal.approval_status === "pending").length,
+        unsignedSignatureRequests: data.signatureRequests.filter((request) => !["signed", "declined", "expired"].includes(request.status)).length,
+        staleMerchants,
+      },
       pipeline: activeDeals.map((deal) => {
         const merchant = data.merchants.find((item) => item.id === deal.merchant_id);
         return {
@@ -175,8 +188,12 @@ export function getCopilotJsonSchema() {
           required: ["scope", "title", "content", "entity_id", "confidence", "source_type", "metadata"],
         },
       },
+      suggestions: {
+        type: "array",
+        items: { type: "string" },
+      },
     },
-    required: ["content", "actions", "memories"],
+    required: ["content", "actions", "memories", "suggestions"],
   } as const;
 }
 
@@ -196,30 +213,109 @@ export function sanitizeMemoryDrafts(memories: CopilotMemoryDraft[]) {
     }));
 }
 
-export function buildStructuredFallback(message: string, merchantId?: string | null): CopilotStructuredResponse {
+export function buildStructuredFallback(
+  input:
+    | string
+    | {
+        message: string;
+        merchantId?: string | null;
+        data?: Pick<CrmData, "deals" | "documents" | "merchantUpdates" | "merchants" | "tasks" | "signatureRequests">;
+        selectedMerchant?: Merchant | null;
+      },
+  merchantId?: string | null,
+): CopilotStructuredResponse {
+  const params = typeof input === "string" ? { message: input, merchantId } : input;
+  const message = params.message.trim();
   const lower = message.toLowerCase();
-  const merchantPayload = merchantId ? { merchant_id: merchantId } : {};
+  const matchedMerchant = params.selectedMerchant ?? findMerchantByMessage(params.data?.merchants ?? [], message);
+  const merchantPayload = matchedMerchant ? { merchant_id: matchedMerchant.id } : params.merchantId ? { merchant_id: params.merchantId } : {};
+  const merchantName = matchedMerchant?.business_name ?? extractFallbackMerchantName(message);
   const learnedMemory = maybeBuildMemory(message);
+  const volume = extractMoneyAmount(message);
+  const dueDate = inferDueDate(lower);
 
-  if (lower.includes("follow") || lower.includes("tomorrow") || lower.includes("friday")) {
+  if (isSmallTalk(lower)) {
     return {
       content:
-        "I found a follow-up intent. I can create the task, add the note to the merchant timeline, and flag missing statements or volume details before pricing.",
+        "Hey. I am ready to help with pipeline follow-ups, merchant notes, underwriting prep, task creation, recruiting, documents, and commission questions. Give me a messy update or ask what needs attention today.",
+      actions: [],
+      memories: learnedMemory ? [learnedMemory] : [],
+      suggestions: [
+        "Which merchants need attention today?",
+        "Draft a follow-up for my hottest opportunity",
+        "Create a task from this call note",
+      ],
+    };
+  }
+
+  if (params.data && /\b(which|what|show|list|prioritize|prioritise|who)\b/i.test(lower) && /\b(follow\s?ups?|today|overdue|next best|attention|priorit)/i.test(lower)) {
+    const recommendations = buildFollowUpRecommendations(params.data);
+    return {
+      content: recommendations.length
+        ? `Here are the best follow-ups to work now:\n\n${recommendations.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n\nI can turn any of these into tasks or draft the outreach.`
+        : "I do not see any obvious overdue follow-ups in the current CRM snapshot. A good next move is to review qualified or underwriting merchants for missing statements, owner details, and pricing approvals.",
       actions: [
         {
-          action_type: "create_task",
-          action_summary: "Create a follow-up task from the requested timing.",
-          requires_confirmation: true,
-          payload: { title: "Follow up with merchant", priority: "high", due_date: inferDueDate(lower), ...merchantPayload },
-        },
-        {
-          action_type: "add_merchant_update",
-          action_summary: "Add the conversation note to the merchant timeline.",
-          requires_confirmation: true,
-          payload: { update_type: "call", note: message, ...merchantPayload },
+          action_type: "next_best_action",
+          action_summary: "Prioritize the next merchant follow-ups from open tasks and stale pipeline activity.",
+          requires_confirmation: false,
+          payload: { recommendations },
         },
       ],
       memories: learnedMemory ? [learnedMemory] : [],
+      suggestions: ["Create tasks for the top follow-ups", "Draft outreach for the first merchant", "Show underwriting blockers"],
+    };
+  }
+
+  if (lower.includes("follow") || lower.includes("tomorrow") || lower.includes("friday")) {
+    const actions: CopilotActionDraft[] = [
+      {
+        action_type: "create_task",
+        action_summary: `Create a high-priority follow-up task${matchedMerchant ? ` for ${matchedMerchant.business_name}` : ""}.`,
+        requires_confirmation: true,
+        payload: {
+          title: matchedMerchant ? `Follow up with ${matchedMerchant.business_name}` : "Follow up with merchant",
+          description: message,
+          priority: "high",
+          due_date: dueDate,
+          ...merchantPayload,
+        },
+      },
+    ];
+
+    if (matchedMerchant) {
+      actions.push({
+        action_type: "add_merchant_update",
+        action_summary: `Add this note to ${matchedMerchant.business_name}'s timeline.`,
+        requires_confirmation: true,
+        payload: { update_type: "call", note: message, next_follow_up_date: dueDate, ...merchantPayload },
+      });
+    } else if (merchantName !== "New Merchant Lead") {
+      actions.push({
+        action_type: "create_merchant",
+        action_summary: `Create ${merchantName} as a merchant lead.`,
+        requires_confirmation: true,
+        payload: { source_text: message, status: "lead", business_name: merchantName, monthly_volume_estimate: volume },
+      });
+    }
+
+    if (matchedMerchant && volume > 0 && volume !== matchedMerchant.monthly_volume_estimate) {
+      actions.push({
+        action_type: "update_merchant_profile",
+        action_summary: `Update ${matchedMerchant.business_name}'s estimated monthly volume to ${formatMoney(volume)}.`,
+        requires_confirmation: true,
+        payload: { monthly_volume_estimate: volume, ...merchantPayload },
+      });
+    }
+
+    return {
+      content:
+        matchedMerchant
+          ? `I matched this to ${matchedMerchant.business_name}. I prepared a follow-up task, a timeline note, and ${volume > 0 ? `captured the ${formatMoney(volume)}/month volume signal` : "will keep underwriting blockers visible"}. Before underwriting, make sure statements, owner verification, average ticket, and current processor details are complete.`
+          : `I did not find a confident existing merchant match. I can still create the follow-up task${merchantName !== "New Merchant Lead" ? ` and a new lead for ${merchantName}` : ""}, but I would confirm the business name, contact email, phone, processor, volume, and average ticket.`,
+      actions,
+      memories: learnedMemory ? [learnedMemory] : [],
+      suggestions: ["Draft the follow-up email", "Show missing underwriting fields", "Create onboarding from this lead"],
     };
   }
 
@@ -235,12 +331,13 @@ export function buildStructuredFallback(message: string, merchantId?: string | n
           payload: {
             source_text: message,
             status: "lead",
-            business_name: extractFallbackMerchantName(message),
-            monthly_volume_estimate: extractMoneyAmount(message),
+            business_name: merchantName,
+            monthly_volume_estimate: volume,
           },
         },
       ],
       memories: learnedMemory ? [learnedMemory] : [],
+      suggestions: ["Create a follow-up task", "Start merchant onboarding", "Request statements and owner ID"],
     };
   }
 
@@ -257,12 +354,13 @@ export function buildStructuredFallback(message: string, merchantId?: string | n
         },
       ],
       memories: learnedMemory ? [learnedMemory] : [],
+      suggestions: ["Show underwriting checklist", "Create a signature request", "Draft missing-documents email"],
     };
   }
 
   return {
     content:
-      "I parsed the update and can turn it into a CRM note, detect missing fields, create a follow-up, or capture durable company knowledge for future answers.",
+      "I can help with that. I did not see enough detail for a safe CRM write yet, but I can summarize the account, find missing fields, create a task, draft outreach, or save durable company knowledge if this is a policy or process note.",
     actions: [
       {
         action_type: "next_best_action",
@@ -272,6 +370,7 @@ export function buildStructuredFallback(message: string, merchantId?: string | n
       },
     ],
     memories: learnedMemory ? [learnedMemory] : [],
+    suggestions: ["Find missing fields", "Create a follow-up task", "Remember this as company process"],
   };
 }
 
@@ -305,6 +404,35 @@ function summarizeMerchant(merchant: Merchant, tasks: Task[]) {
   };
 }
 
+function buildStaleMerchantSignals(
+  data: Pick<CrmData, "deals" | "merchantUpdates" | "merchants" | "tasks" | "signatureRequests">,
+) {
+  const fourteenDaysAgo = Date.now() - 14 * 86_400_000;
+  return data.merchants
+    .filter((merchant) => !["processing", "lost", "inactive"].includes(merchant.status))
+    .map((merchant) => {
+      const latestUpdate = data.merchantUpdates
+        .filter((update) => update.merchant_id === merchant.id)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      const openTasks = data.tasks.filter((task) => task.merchant_id === merchant.id && task.status !== "completed");
+      const unsignedDocuments = data.signatureRequests.filter(
+        (request) => request.related_entity_id === merchant.id && !["signed", "declined", "expired"].includes(request.status),
+      );
+      const lastTouchedAt = latestUpdate?.created_at ?? merchant.updated_at ?? merchant.created_at;
+      return {
+        merchant_id: merchant.id,
+        business_name: merchant.business_name,
+        status: merchant.status,
+        open_tasks: openTasks.length,
+        unsigned_signature_requests: unsignedDocuments.length,
+        last_touched_at: lastTouchedAt,
+        stale: new Date(lastTouchedAt).getTime() < fourteenDaysAgo,
+      };
+    })
+    .filter((signal) => signal.open_tasks || signal.unsigned_signature_requests || signal.stale)
+    .slice(0, 10);
+}
+
 function summarizeTask(task: Task) {
   return {
     id: task.id,
@@ -327,6 +455,56 @@ function maybeBuildMemory(message: string): CopilotMemoryDraft | null {
     source_type: "copilot_chat",
     metadata: { capture: "fallback" },
   };
+}
+
+function isSmallTalk(lowerMessage: string) {
+  return /^(hi|hello|hey|yo|sup|good morning|good afternoon|good evening)[.!?\s]*$/i.test(lowerMessage);
+}
+
+function buildFollowUpRecommendations(
+  data: Pick<CrmData, "deals" | "merchantUpdates" | "merchants" | "tasks" | "signatureRequests">,
+) {
+  const now = Date.now();
+  const recommendations = data.tasks
+    .filter((task) => task.status !== "completed")
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+    .slice(0, 4)
+    .map((task) => {
+      const merchant = task.merchant_id ? data.merchants.find((item) => item.id === task.merchant_id) : null;
+      const due = new Date(task.due_date);
+      const dueLabel = due.getTime() < now ? "overdue" : `due ${due.toLocaleDateString()}`;
+      return `${merchant?.business_name ?? "General task"}: ${task.title} (${dueLabel}, ${task.priority} priority)`;
+    });
+
+  if (recommendations.length >= 4) return recommendations;
+
+  const staleSignals = buildStaleMerchantSignals(data)
+    .filter((signal) => signal.stale)
+    .slice(0, 4 - recommendations.length)
+    .map((signal) => `${signal.business_name}: no recent activity since ${new Date(signal.last_touched_at).toLocaleDateString()} while in ${signal.status}.`);
+
+  return [...recommendations, ...staleSignals].slice(0, 4);
+}
+
+function findMerchantByMessage(merchants: Merchant[], message: string) {
+  const normalizedMessage = normalizeForMatch(message);
+  return merchants.find((merchant) => {
+    const businessWords = normalizeForMatch(merchant.business_name).split(" ").filter((word) => word.length > 2);
+    const contactWords = normalizeForMatch(merchant.contact_name).split(" ").filter((word) => word.length > 2);
+    const businessMatch =
+      businessWords.length > 0 &&
+      (normalizedMessage.includes(businessWords.join(" ")) || businessWords.slice(0, 2).every((word) => normalizedMessage.includes(word)));
+    const contactMatch = contactWords.length > 0 && contactWords.some((word) => normalizedMessage.includes(word));
+    return businessMatch || (contactMatch && businessWords.some((word) => normalizedMessage.includes(word)));
+  }) ?? null;
+}
+
+function normalizeForMatch(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function containsSensitiveSecret(value: string) {
@@ -365,6 +543,14 @@ function extractMoneyAmount(message: string) {
   if (match[2]?.toLowerCase() === "m") return base * 1_000_000;
   if (match[2]?.toLowerCase() === "k") return base * 1_000;
   return base;
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function extractFallbackMerchantName(message: string) {

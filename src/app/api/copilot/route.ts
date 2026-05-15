@@ -41,6 +41,7 @@ const CopilotResponseSchema: z.ZodType<CopilotStructuredResponse> = z.object({
   content: z.string(),
   actions: z.array(CopilotActionSchema),
   memories: z.array(CopilotMemorySchema),
+  suggestions: z.array(z.string()),
 });
 
 export async function POST(request: Request) {
@@ -84,10 +85,20 @@ export async function POST(request: Request) {
           model: copilotSettings.model,
           reasoning: copilotSettings.reasoning,
         })
-      : buildStructuredFallback(body.data.message, body.data.merchantId ?? null);
+      : buildStructuredFallback({
+          message: body.data.message,
+          merchantId: body.data.merchantId ?? null,
+          data,
+          selectedMerchant,
+        });
   } catch (error) {
     console.warn("Copilot OpenAI response failed; using structured fallback.", error);
-    result = buildStructuredFallback(body.data.message, body.data.merchantId ?? null);
+    result = buildStructuredFallback({
+      message: body.data.message,
+      merchantId: body.data.merchantId ?? null,
+      data,
+      selectedMerchant,
+    });
   }
 
   const { data: assistantMessage } = await supabase
@@ -132,6 +143,7 @@ export async function POST(request: Request) {
         id: assistantMessage?.id ?? crypto.randomUUID(),
         content: `${result.content}\n\nI saved the message, but could not persist suggested actions: ${actionsError.message}`,
         actions: [],
+        suggestions: result.suggestions,
       },
       { status: 200 },
     );
@@ -143,6 +155,7 @@ export async function POST(request: Request) {
     actions: persistedActions ?? [],
     memoriesCreated: memories.length,
     model: copilotSettings.model,
+    suggestions: result.suggestions,
   });
 }
 
