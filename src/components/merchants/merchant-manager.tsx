@@ -22,6 +22,7 @@ import { DeleteMerchantButton } from "@/components/merchants/delete-merchant-but
 import { createMerchantAction, updateMerchantStatusAction } from "@/lib/actions";
 import { requiresManagementApproval } from "@/lib/compensation";
 import { pipelineStages } from "@/lib/demo-data";
+import { calculateResidualBreakdown } from "@/lib/processor-pricing";
 import type { CrmData, Merchant, MerchantStatus, Profile } from "@/lib/types";
 import { currency, daysBetween, percent, titleCase } from "@/lib/utils";
 
@@ -192,6 +193,15 @@ export function MerchantManager({
   });
 
   const selectedMerchant = merchants.find((merchant) => merchant.id === selectedId) ?? merchants[0];
+  const selectedResidualEstimate = selectedMerchant
+    ? calculateResidualBreakdown({
+        processingVolume: selectedMerchant.monthly_volume_estimate,
+        proposedRatePercent: selectedMerchant.proposed_rate,
+        processorName: selectedMerchant.current_processor,
+        pricingSettings: data.processorPricingSettings,
+        compensationRule: data.compensationRule,
+      }).netResidual
+    : 0;
   const visibleMerchants = table.getFilteredRowModel().rows.map((row) => row.original);
   const visibleVolume = visibleMerchants.reduce((total, merchant) => total + Number(merchant.monthly_volume_estimate || 0), 0);
   const visibleApprovals = visibleMerchants.filter((merchant) => requiresManagementApproval(Number(merchant.proposed_rate || 0))).length;
@@ -567,7 +577,7 @@ export function MerchantManager({
                 <ProfileLine icon={<Phone className="h-4 w-4" />} label={selectedMerchant.contact_name} value={selectedMerchant.contact_phone} />
                 <ProfileLine icon={<Mail className="h-4 w-4" />} label="Email" value={selectedMerchant.contact_email || "Missing"} />
                 <ProfileLine icon={<FileText className="h-4 w-4" />} label="Processor" value={selectedMerchant.current_processor} />
-                <ProfileLine icon={<CheckCircle2 className="h-4 w-4" />} label="Residual estimate" value={currency(selectedMerchant.monthly_volume_estimate * (selectedMerchant.proposed_rate / 100) * 0.28)} />
+                <ProfileLine icon={<CheckCircle2 className="h-4 w-4" />} label="Residual estimate" value={currency(selectedResidualEstimate)} />
               </div>
               <div className="crm-panel rounded-2xl p-3 text-sm text-[#25425E]">
                 {selectedMerchant.notes || "No notes yet."}

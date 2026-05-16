@@ -7,9 +7,11 @@ describe("enterprise permission defaults", () => {
 
     expect(hasPermission("agent", permissions, "finance.export")).toBe(false);
     expect(hasPermission("manager", permissions, "payroll.export")).toBe(false);
+    expect(hasPermission("manager", permissions, "processor_pricing.manage")).toBe(false);
     expect(hasPermission("manager", permissions, "underwriting.manage")).toBe(false);
     expect(hasPermission("admin", permissions, "finance.export")).toBe(true);
     expect(hasPermission("admin", permissions, "payroll.integrations")).toBe(true);
+    expect(hasPermission("admin", permissions, "processor_pricing.manage")).toBe(true);
     expect(hasPermission("admin", permissions, "underwriting.manage")).toBe(true);
   });
 });

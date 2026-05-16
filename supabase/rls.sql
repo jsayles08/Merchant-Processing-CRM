@@ -25,6 +25,7 @@ alter table copilot_actions enable row level security;
 alter table copilot_memories enable row level security;
 alter table processor_connections enable row level security;
 alter table processor_sync_runs enable row level security;
+alter table processor_pricing_settings enable row level security;
 alter table financial_exports enable row level security;
 alter table payroll_exports enable row level security;
 alter table payroll_integrations enable row level security;
@@ -930,6 +931,18 @@ with check (
       )
   )
 );
+
+drop policy if exists "processor pricing visible by authenticated" on processor_pricing_settings;
+drop policy if exists "processor pricing visible by admin" on processor_pricing_settings;
+create policy "processor pricing visible by admin"
+on processor_pricing_settings for select
+using (is_admin());
+
+drop policy if exists "admin manages processor pricing" on processor_pricing_settings;
+create policy "admin manages processor pricing"
+on processor_pricing_settings for all
+using (is_admin())
+with check (is_admin());
 
 drop policy if exists "financial exports visible to requester or admin" on financial_exports;
 create policy "financial exports visible to requester or admin"

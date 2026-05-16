@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarClock, FileUp, Mail, Phone, ReceiptText } from "luci
 import { createMerchantUpdateAction, uploadMerchantDocumentAction } from "@/lib/actions";
 import { getMerchantDetailData } from "@/lib/data";
 import { getCrmPageContext } from "@/lib/page-context";
+import { calculateResidualBreakdown } from "@/lib/processor-pricing";
 import { AppShell } from "@/components/app-shell";
 import { DeleteMerchantButton } from "@/components/merchants/delete-merchant-button";
 import { Button } from "@/components/ui/button";
@@ -23,9 +24,14 @@ export default async function MerchantProfilePage({
 
   if (!detail) notFound();
 
-  const estimatedResidual =
-    detail.deal?.estimated_residual ??
-    Math.round(detail.merchant.monthly_volume_estimate * (detail.merchant.proposed_rate / 100) * 0.28);
+  const fallbackResidual = calculateResidualBreakdown({
+    processingVolume: detail.merchant.monthly_volume_estimate,
+    proposedRatePercent: detail.merchant.proposed_rate,
+    processorName: detail.merchant.current_processor,
+    pricingSettings: data.processorPricingSettings,
+    compensationRule: data.compensationRule,
+  }).netResidual;
+  const estimatedResidual = detail.deal?.estimated_residual ?? fallbackResidual;
   async function saveMerchantUpdate(formData: FormData) {
     "use server";
     await createMerchantUpdateAction(formData);

@@ -17,6 +17,8 @@ type ExportPayload = {
   rows: unknown[];
   totals: {
     processingVolume: number;
+    grossProcessingRevenue: number;
+    processorCost: number;
     netResidual: number;
     agentPayout: number;
     companyShare: number;
@@ -65,7 +67,7 @@ export function FinanceExporter({ data }: { data: CrmData }) {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle>CPA Financial Export</CardTitle>
-            <CardDescription>Generate normalized accounting exports with residual, payout, and company-share totals.</CardDescription>
+            <CardDescription>Generate normalized accounting exports with processor cost, residual, payout, and company-share totals.</CardDescription>
           </div>
           <Badge tone="blue">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -127,8 +129,9 @@ export function FinanceExporter({ data }: { data: CrmData }) {
         </div>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-5">
             <ExportStat label="Rows" value={lastExport?.rows.length.toString() ?? data.residuals.length.toString()} />
+            <ExportStat label="Processor cost" value={currency(lastExport?.totals.processorCost ?? data.residuals.reduce((sum, item) => sum + Number(item.processor_cost || 0), 0))} />
             <ExportStat label="Net residual" value={currency(lastExport?.totals.netResidual ?? data.residuals.reduce((sum, item) => sum + item.net_residual, 0))} />
             <ExportStat label="Agent payout" value={currency(lastExport?.totals.agentPayout ?? data.residuals.reduce((sum, item) => sum + item.agent_residual_amount, 0))} />
             <ExportStat label="Company share" value={currency(lastExport?.totals.companyShare ?? data.residuals.reduce((sum, item) => sum + item.company_share, 0))} />

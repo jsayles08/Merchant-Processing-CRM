@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
-import type { CopilotAction, MerchantStatus } from "@/lib/types";
+import { calculateResidualBreakdown } from "@/lib/processor-pricing";
+import type { CompensationRule, CopilotAction, MerchantStatus, ProcessorPricingSetting } from "@/lib/types";
 
 const merchantStatuses: MerchantStatus[] = [
   "lead",
@@ -75,6 +77,19 @@ export async function POST(
     const proposedRate = typeof payload.proposed_rate === "number" ? payload.proposed_rate : 1.65;
     const monthlyVolume = typeof payload.monthly_volume_estimate === "number" ? payload.monthly_volume_estimate : 0;
 
+    const [processorPricingSettings, compensationRule] = await Promise.all([
+      loadProcessorPricingSettings(supabase),
+      loadCompensationRule(supabase),
+    ]);
+    const processorName = typeof payload.current_processor === "string" ? payload.current_processor : null;
+    const residualEstimate = calculateResidualBreakdown({
+      processingVolume: monthlyVolume,
+      proposedRatePercent: proposedRate,
+      processorName,
+      pricingSettings: processorPricingSettings,
+      compensationRule,
+    });
+
     const { data: merchant, error: merchantError } = await supabase
       .from("merchants")
       .insert({
@@ -86,7 +101,7 @@ export async function POST(
         industry: typeof payload.industry === "string" ? payload.industry : "Uncategorized",
         monthly_volume_estimate: monthlyVolume,
         average_ticket: typeof payload.average_ticket === "number" ? payload.average_ticket : 0,
-        current_processor: typeof payload.current_processor === "string" ? payload.current_processor : null,
+        current_processor: processorName,
         proposed_rate: proposedRate,
         status,
         assigned_agent_id: assignedAgentId,
@@ -103,7 +118,7 @@ export async function POST(
       stage: status,
       proposed_rate: proposedRate,
       estimated_monthly_volume: monthlyVolume,
-      estimated_residual: Math.round(monthlyVolume * (proposedRate / 100) * 0.28),
+      estimated_residual: residualEstimate.netResidual,
       close_probability: status === "processing" ? 100 : 25,
     });
     if (dealError) throw dealError;
@@ -186,6 +201,36 @@ export async function POST(
     }
     if (typeof payload.proposed_rate === "number") {
       dealPatch.proposed_rate = payload.proposed_rate;
+    }
+    if (
+      "monthly_volume_estimate" in merchantPatch ||
+      "proposed_rate" in merchantPatch ||
+      "current_processor" in merchantPatch
+    ) {
+      const { data: updatedMerchant } = await supabase
+        .from("merchants")
+        .select("monthly_volume_estimate,proposed_rate,current_processor")
+        .eq("id", merchantId)
+        .maybeSingle<{
+          monthly_volume_estimate: number;
+          proposed_rate: number;
+          current_processor: string | null;
+        }>();
+
+      if (updatedMerchant) {
+        const [processorPricingSettings, compensationRule] = await Promise.all([
+          loadProcessorPricingSettings(supabase),
+          loadCompensationRule(supabase),
+        ]);
+        const estimate = calculateResidualBreakdown({
+          processingVolume: updatedMerchant.monthly_volume_estimate,
+          proposedRatePercent: updatedMerchant.proposed_rate,
+          processorName: updatedMerchant.current_processor,
+          pricingSettings: processorPricingSettings,
+          compensationRule,
+        });
+        dealPatch.estimated_residual = estimate.netResidual;
+      }
     }
     if (Object.keys(dealPatch).length) {
       const dealUpdate = await supabase.from("deals").update(dealPatch).eq("merchant_id", merchantId);
@@ -385,4 +430,40 @@ function extractBusinessName(sourceText: string) {
   const calledMatch = sourceText.match(/called\s+([^.,]+?)(?:\s+contact|\s+wants|\.|,|$)/i);
   const merchantMatch = sourceText.match(/merchant\s+(?:called|named)?\s*([^.,]+?)(?:\s+contact|\s+wants|\.|,|$)/i);
   return (calledMatch?.[1] || merchantMatch?.[1] || "New Merchant Lead").trim();
+}
+
+async function loadProcessorPricingSettings(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("processor_pricing_settings")
+    .select("*")
+    .order("effective_at", { ascending: false })
+    .returns<ProcessorPricingSetting[]>();
+
+  if (error) {
+    console.warn("Processor pricing settings are not available yet.", error.message);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+async function loadCompensationRule(supabase: SupabaseClient): Promise<CompensationRule> {
+  const { data } = await supabase
+    .from("compensation_rules")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .returns<CompensationRule[]>();
+
+  return data?.[0] ?? {
+    id: "default",
+    rule_name: "MerchantDesk Standard Agent Plan",
+    base_residual_percentage: 40,
+    minimum_processing_rate: 1.5,
+    override_per_active_recruit: 0.25,
+    max_override_per_team: 1,
+    active_recruit_required_merchants: 2,
+    active_recruit_required_processing_days: 90,
+    created_at: new Date(0).toISOString(),
+  };
 }

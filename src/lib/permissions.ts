@@ -33,6 +33,7 @@ export type PermissionKey =
   | "notifications.view"
   | "settings.view"
   | "processor_connections.manage"
+  | "processor_pricing.manage"
   | "settings.manage_users"
   | "settings.manage_access"
   | "underwriting.manage"
@@ -84,6 +85,7 @@ export const permissionCatalog: PermissionCatalogItem[] = [
   { key: "notifications.view", label: "Notifications", description: "View CRM notifications and delivery logs.", category: "Core CRM", navHref: "/notifications" },
   { key: "settings.view", label: "Settings", description: "Open personal and enterprise settings workspace.", category: "Administration", navHref: "/settings", critical: true },
   { key: "processor_connections.manage", label: "Processor connections", description: "Connect and sync processor/provider accounts for assigned books.", category: "Administration" },
+  { key: "processor_pricing.manage", label: "Processor pricing", description: "Manage processor cost rates used in margins, residuals, exports, and compensation.", category: "Administration", adminOnly: true },
   { key: "settings.manage_users", label: "Manage users", description: "Create users, assign managers, and reassign books.", category: "Administration", adminOnly: true },
   { key: "settings.manage_access", label: "Manage access", description: "Change role permissions and enterprise policy controls.", category: "Administration", critical: true, adminOnly: true },
   { key: "underwriting.manage", label: "Underwriting rules", description: "Configure automatic approval, denial, and manual review guidelines.", category: "Administration", adminOnly: true },
@@ -129,6 +131,7 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "notifications.view": true,
     "settings.view": true,
     "processor_connections.manage": true,
+    "processor_pricing.manage": false,
     "settings.manage_users": false,
     "settings.manage_access": false,
     "underwriting.manage": false,
@@ -170,6 +173,7 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "notifications.view": true,
     "settings.view": true,
     "processor_connections.manage": true,
+    "processor_pricing.manage": false,
     "settings.manage_users": false,
     "settings.manage_access": false,
     "underwriting.manage": false,

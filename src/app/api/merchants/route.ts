@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getIntegrationAuthError } from "@/lib/api-auth";
 import { writeAuditLog } from "@/lib/audit";
+import { calculateResidualBreakdown } from "@/lib/processor-pricing";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Agent, Merchant } from "@/lib/types";
+import type { Agent, CompensationRule, Merchant, ProcessorPricingSetting } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Assigned agent was not found." }, { status: 404 });
   }
 
-  const requiresApproval = parsed.data.proposed_rate < 1.5;
+  const [processorPricingSettings, compensationRule] = await Promise.all([
+    loadProcessorPricingSettings(supabase),
+    loadCompensationRule(supabase),
+  ]);
+  const requiresApproval = parsed.data.proposed_rate < compensationRule.minimum_processing_rate;
+  const residualEstimate = calculateResidualBreakdown({
+    processingVolume: parsed.data.monthly_volume_estimate,
+    proposedRatePercent: parsed.data.proposed_rate,
+    processorName: parsed.data.current_processor,
+    pricingSettings: processorPricingSettings,
+    compensationRule,
+  });
   const { data: merchant, error } = await supabase
     .from("merchants")
     .insert({
@@ -169,7 +181,7 @@ export async function POST(request: Request) {
     requires_management_approval: requiresApproval,
     approval_status: requiresApproval ? "pending" : "not_required",
     estimated_monthly_volume: parsed.data.monthly_volume_estimate,
-    estimated_residual: Math.round(parsed.data.monthly_volume_estimate * (parsed.data.proposed_rate / 100) * 0.28),
+    estimated_residual: residualEstimate.netResidual,
   });
 
   if (dealError) {
@@ -197,10 +209,42 @@ export async function POST(request: Request) {
       assigned_agent_email: parsed.data.assigned_agent_email ?? null,
       status: parsed.data.status,
       requires_approval: requiresApproval,
+      processor_pricing: residualEstimate.pricingSnapshot,
     },
   });
 
   return NextResponse.json({ ok: true, merchant }, { status: 201 });
+}
+
+async function loadProcessorPricingSettings(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("processor_pricing_settings")
+    .select("*")
+    .order("effective_at", { ascending: false })
+    .returns<ProcessorPricingSetting[]>();
+  if (error) return [];
+  return data ?? [];
+}
+
+async function loadCompensationRule(supabase: SupabaseClient): Promise<CompensationRule> {
+  const { data } = await supabase
+    .from("compensation_rules")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .returns<CompensationRule[]>();
+
+  return data?.[0] ?? {
+    id: "default",
+    rule_name: "MerchantDesk Standard Agent Plan",
+    base_residual_percentage: 40,
+    minimum_processing_rate: 1.5,
+    override_per_active_recruit: 0.25,
+    max_override_per_team: 1,
+    active_recruit_required_merchants: 2,
+    active_recruit_required_processing_days: 90,
+    created_at: new Date(0).toISOString(),
+  };
 }
 
 async function resolveAssignedAgent(

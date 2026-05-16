@@ -13,6 +13,9 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
     const residual = data.residuals
       .filter((item) => item.agent_id === agent.id)
       .reduce((sum, item) => sum + item.net_residual, 0);
+    const payout = data.residuals
+      .filter((item) => item.agent_id === agent.id)
+      .reduce((sum, item) => sum + item.agent_residual_amount, 0);
     const pipeline = data.deals
       .filter((deal) => deal.agent_id === agent.id && !["processing", "lost", "inactive"].includes(deal.stage))
       .reduce((sum, deal) => sum + deal.estimated_monthly_volume, 0);
@@ -21,7 +24,7 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
       name: profile?.full_name ?? agent.agent_code,
       merchants: merchants.length,
       residual,
-      payout: residual * (data.compensationRule.base_residual_percentage / 100),
+      payout,
       pipeline,
     };
   });
@@ -32,6 +35,7 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
 
   const totalResidual = data.residuals.reduce((sum, residual) => sum + residual.net_residual, 0);
   const totalPayout = data.residuals.reduce((sum, residual) => sum + residual.agent_residual_amount, 0);
+  const totalProcessorCost = data.residuals.reduce((sum, residual) => sum + Number(residual.processor_cost || 0), 0);
 
   return (
     <section id="reports" className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -68,9 +72,10 @@ export function BusinessReports({ data, currentProfile }: { data: CrmData; curre
               ))}
             </tbody>
           </table>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-4">
             <Summary icon={<CircleDollarSign className="h-4 w-4" />} label="Agent payout" value={currency(totalPayout)} />
             <Summary icon={<BarChart3 className="h-4 w-4" />} label="Company share" value={currency(totalResidual - totalPayout)} />
+            <Summary icon={<BarChart3 className="h-4 w-4" />} label="Processor cost" value={currency(totalProcessorCost)} />
             <Summary icon={<UsersRound className="h-4 w-4" />} label="Agents" value={data.agents.length.toString()} />
           </div>
         </CardContent>

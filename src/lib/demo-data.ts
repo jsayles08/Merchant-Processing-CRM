@@ -1,6 +1,7 @@
 import type { CrmData, MerchantStatus } from "@/lib/types";
 import { calculatePersonalResidual, requiresManagementApproval } from "@/lib/compensation";
 import { defaultRolePermissions, enterpriseSettingDefaults } from "@/lib/permissions";
+import { calculateResidualBreakdown } from "@/lib/processor-pricing";
 
 const now = "2026-05-06T12:00:00.000Z";
 
@@ -522,6 +523,38 @@ export const demoData: CrmData = {
       updated_at: now,
     },
   ],
+  processorPricingSettings: [
+    {
+      id: "processor-pricing-fiserv",
+      processor_key: "fiserv",
+      processor_name: "Fiserv",
+      pricing_unit: "basis_points",
+      rate_value: 1.5,
+      flat_fee: null,
+      effective_at: "2026-01-01",
+      is_active: true,
+      notes: "Default Fiserv processor cost: 1.5 basis points.",
+      created_by: "profile-admin",
+      updated_by: "profile-admin",
+      created_at: now,
+      updated_at: now,
+    },
+    {
+      id: "processor-pricing-nuvei",
+      processor_key: "nuvei",
+      processor_name: "Nuvei",
+      pricing_unit: "basis_points",
+      rate_value: 2,
+      flat_fee: null,
+      effective_at: "2026-01-01",
+      is_active: true,
+      notes: "Placeholder Nuvei pricing; adjust when production pricing is finalized.",
+      created_by: "profile-admin",
+      updated_by: "profile-admin",
+      created_at: now,
+      updated_at: now,
+    },
+  ],
   processorSyncRuns: [
     {
       id: "processor-sync-1",
@@ -676,7 +709,13 @@ export const demoData: CrmData = {
 };
 
 demoData.deals = demoData.merchants.map((merchant) => {
-  const estimatedResidual = merchant.monthly_volume_estimate * (merchant.proposed_rate / 100) * 0.28;
+  const estimatedResidual = calculateResidualBreakdown({
+    processingVolume: merchant.monthly_volume_estimate,
+    proposedRatePercent: merchant.proposed_rate,
+    processorName: merchant.current_processor,
+    pricingSettings: demoData.processorPricingSettings,
+    compensationRule: demoData.compensationRule,
+  }).netResidual;
 
   return {
     id: `deal-${merchant.id}`,

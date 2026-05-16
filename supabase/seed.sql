@@ -42,15 +42,35 @@ on conflict (id) do nothing;
 
 insert into deals (merchant_id, agent_id, stage, proposed_rate, estimated_monthly_volume, estimated_residual, close_probability, expected_close_date)
 select
-  id,
-  assigned_agent_id,
-  status,
-  proposed_rate,
-  monthly_volume_estimate,
-  round(monthly_volume_estimate * (proposed_rate / 100) * 0.28, 2),
-  case when status = 'processing' then 100 when status = 'underwriting' then 68 else 42 end,
+  m.id,
+  m.assigned_agent_id,
+  m.status,
+  m.proposed_rate,
+  m.monthly_volume_estimate,
+  round(
+    case
+      when p.id is null then m.monthly_volume_estimate * (m.proposed_rate / 100) * 0.28
+      when p.pricing_unit = 'basis_points' then greatest(m.monthly_volume_estimate * (m.proposed_rate / 100) - (m.monthly_volume_estimate * (p.rate_value / 10000)), 0)
+      when p.pricing_unit = 'basis_points_plus_flat' then greatest(m.monthly_volume_estimate * (m.proposed_rate / 100) - (m.monthly_volume_estimate * (p.rate_value / 10000) + coalesce(p.flat_fee, 0)), 0)
+      when p.pricing_unit = 'percentage' then greatest(m.monthly_volume_estimate * (m.proposed_rate / 100) - (m.monthly_volume_estimate * (m.proposed_rate / 100) * (p.rate_value / 100)), 0)
+      when p.pricing_unit = 'percentage_plus_flat' then greatest(m.monthly_volume_estimate * (m.proposed_rate / 100) - (m.monthly_volume_estimate * (m.proposed_rate / 100) * (p.rate_value / 100) + coalesce(p.flat_fee, 0)), 0)
+      when p.pricing_unit = 'flat_fee' then greatest(m.monthly_volume_estimate * (m.proposed_rate / 100) - coalesce(p.flat_fee, p.rate_value, 0), 0)
+      else m.monthly_volume_estimate * (m.proposed_rate / 100) * 0.28
+    end,
+    2
+  ),
+  case when m.status = 'processing' then 100 when m.status = 'underwriting' then 68 else 42 end,
   '2026-05-31'
-from merchants
+from merchants m
+left join lateral (
+  select *
+  from processor_pricing_settings p
+  where p.is_active = true
+    and p.processor_key = trim(both '_' from regexp_replace(replace(lower(coalesce(m.current_processor, 'unknown')), '&', 'and'), '[^a-z0-9]+', '_', 'g'))
+    and p.effective_at <= current_date
+  order by p.effective_at desc, p.updated_at desc
+  limit 1
+) p on true
 on conflict (merchant_id) do nothing;
 
 insert into residuals (merchant_id, agent_id, month, processing_volume, net_residual, agent_residual_amount, company_share)

@@ -11,8 +11,10 @@ describe("financial exports", () => {
 
     expect(result.rows.length).toBeGreaterThan(0);
     expect(result.csv).toContain("statement_month");
+    expect(result.csv).toContain("processor_cost");
     expect(result.csv).toContain("TOTAL");
     expect(result.totals.netResidual).toBeGreaterThan(0);
+    expect(result.totals.processorCost).toBeGreaterThanOrEqual(0);
     expect(result.totals.processingVolume).toBeGreaterThan(0);
   });
 

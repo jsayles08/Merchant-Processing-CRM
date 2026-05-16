@@ -307,9 +307,22 @@ create table if not exists residuals (
   net_residual numeric(12,2) not null default 0,
   agent_residual_amount numeric(12,2) not null default 0,
   company_share numeric(12,2) not null default 0,
+  gross_processing_revenue numeric(12,2),
+  processor_cost numeric(12,2),
+  processor_pricing_setting_id uuid,
+  processor_pricing_snapshot jsonb,
+  calculation_locked boolean not null default false,
+  recalculated_at timestamptz,
   created_at timestamptz not null default now(),
   unique (merchant_id, month)
 );
+
+alter table residuals add column if not exists gross_processing_revenue numeric(12,2);
+alter table residuals add column if not exists processor_cost numeric(12,2);
+alter table residuals add column if not exists processor_pricing_setting_id uuid;
+alter table residuals add column if not exists processor_pricing_snapshot jsonb;
+alter table residuals add column if not exists calculation_locked boolean not null default false;
+alter table residuals add column if not exists recalculated_at timestamptz;
 
 create table if not exists residual_import_batches (
   id uuid primary key default gen_random_uuid(),
@@ -444,6 +457,37 @@ create table if not exists processor_sync_runs (
   metadata jsonb not null default '{}'::jsonb
 );
 
+create table if not exists processor_pricing_settings (
+  id uuid primary key default gen_random_uuid(),
+  processor_key text not null,
+  processor_name text not null,
+  pricing_unit text not null check (pricing_unit in ('basis_points', 'percentage', 'flat_fee', 'basis_points_plus_flat', 'percentage_plus_flat')),
+  rate_value numeric(12,4) not null default 0,
+  flat_fee numeric(12,4),
+  effective_at date not null default current_date,
+  is_active boolean not null default true,
+  notes text,
+  created_by uuid references profiles(id) on delete set null,
+  updated_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (processor_key, pricing_unit, effective_at)
+);
+
+do $$ begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'residuals_processor_pricing_setting_id_fkey'
+  ) then
+    alter table residuals
+      add constraint residuals_processor_pricing_setting_id_fkey
+      foreign key (processor_pricing_setting_id)
+      references processor_pricing_settings(id)
+      on delete set null;
+  end if;
+end $$;
+
 create table if not exists financial_exports (
   id uuid primary key default gen_random_uuid(),
   requested_by uuid references profiles(id) on delete set null,
@@ -451,11 +495,16 @@ create table if not exists financial_exports (
   filters jsonb not null default '{}'::jsonb,
   row_count integer not null default 0,
   total_processing_volume numeric(14,2) not null default 0,
+  total_gross_processing_revenue numeric(14,2) not null default 0,
+  total_processor_cost numeric(12,2) not null default 0,
   total_net_residual numeric(12,2) not null default 0,
   total_agent_payout numeric(12,2) not null default 0,
   total_company_share numeric(12,2) not null default 0,
   created_at timestamptz not null default now()
 );
+
+alter table financial_exports add column if not exists total_gross_processing_revenue numeric(14,2) not null default 0;
+alter table financial_exports add column if not exists total_processor_cost numeric(12,2) not null default 0;
 
 create table if not exists payroll_exports (
   id uuid primary key default gen_random_uuid(),
@@ -601,6 +650,7 @@ create index if not exists audit_logs_entity_idx on audit_logs (entity_type, ent
 create index if not exists audit_logs_actor_idx on audit_logs (actor_profile_id, created_at desc);
 create index if not exists notification_deliveries_profile_idx on notification_deliveries (profile_id, created_at desc);
 create index if not exists residual_import_batches_created_idx on residual_import_batches (created_at desc);
+create index if not exists residuals_calculation_locked_idx on residuals (calculation_locked, month);
 create index if not exists agent_recruits_status_idx on agent_recruits (status, updated_at desc);
 create index if not exists agent_recruits_recruiter_idx on agent_recruits (assigned_recruiter_id, follow_up_at);
 create index if not exists agent_recruit_updates_recruit_idx on agent_recruit_updates (recruit_id, created_at desc);
@@ -623,6 +673,7 @@ where source_type = 'seed';
 create index if not exists processor_connections_agent_idx on processor_connections (agent_profile_id, status, updated_at desc);
 create index if not exists processor_connections_provider_idx on processor_connections (provider, status, updated_at desc);
 create index if not exists processor_sync_runs_connection_idx on processor_sync_runs (connection_id, started_at desc);
+create index if not exists processor_pricing_settings_lookup_idx on processor_pricing_settings (processor_key, is_active, effective_at desc);
 create index if not exists financial_exports_requested_idx on financial_exports (requested_by, created_at desc);
 create index if not exists payroll_exports_requested_idx on payroll_exports (requested_by, created_at desc);
 create index if not exists payroll_integrations_provider_idx on payroll_integrations (provider, status, updated_at desc);
@@ -655,6 +706,7 @@ to authenticated;
 grant select, insert, update, delete on
   processor_connections,
   processor_sync_runs,
+  processor_pricing_settings,
   financial_exports,
   payroll_exports,
   payroll_integrations,
@@ -714,6 +766,10 @@ for each row execute function set_updated_at();
 
 drop trigger if exists processor_connections_set_updated_at on processor_connections;
 create trigger processor_connections_set_updated_at before update on processor_connections
+for each row execute function set_updated_at();
+
+drop trigger if exists processor_pricing_settings_set_updated_at on processor_pricing_settings;
+create trigger processor_pricing_settings_set_updated_at before update on processor_pricing_settings
 for each row execute function set_updated_at();
 
 drop trigger if exists payroll_integrations_set_updated_at on payroll_integrations;
@@ -960,3 +1016,9 @@ values
   ('Approve complete standard applications', 'approve', 100, '{"minMonthlyVolume":10000,"minDocumentCompletionRate":0.8,"minProposedRate":1.5}'::jsonb),
   ('Manual review incomplete document packets', 'manual_review', 200, '{"maxDocumentCompletionRate":0.79}'::jsonb)
 on conflict (name) do nothing;
+
+insert into processor_pricing_settings (processor_key, processor_name, pricing_unit, rate_value, flat_fee, effective_at, is_active, notes)
+values
+  ('fiserv', 'Fiserv', 'basis_points', 1.5000, null, '1970-01-01', true, 'Default Fiserv processor charge. 1.5 basis points equals 0.015% of processing volume.'),
+  ('nuvei', 'Nuvei', 'basis_points', 2.0000, null, '1970-01-01', true, 'Placeholder Nuvei processor charge. Update when production pricing is finalized.')
+on conflict (processor_key, pricing_unit, effective_at) do nothing;

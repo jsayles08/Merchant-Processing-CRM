@@ -17,6 +17,13 @@ import {
   testPayrollIntegration,
 } from "@/lib/payroll";
 import { enterpriseSettingDefaults, permissionCatalog } from "@/lib/permissions";
+import {
+  buildProcessorPricingAuditMetadata,
+  calculateResidualBreakdown,
+  normalizeProcessorKey,
+  recalculateResidualRow,
+  shouldProtectResidualFromRecalculation,
+} from "@/lib/processor-pricing";
 import { normalizeImportMonth, parseProcessorResidualCsv } from "@/lib/residual-import";
 import { createSignatureProviderRequest } from "@/lib/signature-service";
 import { isIntegrationEncryptionConfigured } from "@/lib/secret-vault";
@@ -39,6 +46,8 @@ import type {
   MerchantOnboardingStep,
   MerchantStatus,
   PayrollProviderId,
+  ProcessorPricingSetting,
+  ProcessorPricingUnit,
   RecruitStatus,
   Role,
   RolePermission,
@@ -268,6 +277,23 @@ const PayrollIntegrationIdInput = z.object({
   integration_id: z.string().uuid(),
 });
 
+const ProcessorPricingInput = z.object({
+  id: z.string().uuid().optional(),
+  processor_name: z.string().trim().min(2).max(120),
+  pricing_unit: z.enum(["basis_points", "percentage", "flat_fee", "basis_points_plus_flat", "percentage_plus_flat"]),
+  rate_value: z.coerce.number().min(0).max(10000),
+  flat_fee: z.coerce.number().min(0).optional().nullable(),
+  effective_at: z.string().trim().min(1),
+  is_active: z.boolean().default(true),
+  notes: z.string().trim().optional(),
+});
+
+const ProcessorPricingRecalculationInput = z.object({
+  includeDeals: z.boolean().default(true),
+  includeResiduals: z.boolean().default(false),
+  includeLockedResiduals: z.boolean().default(false),
+});
+
 const AssignRecruitToTeamInput = z.object({
   recruit_id: z.string().uuid(),
   team_id: z.string().uuid(),
@@ -358,9 +384,17 @@ export async function createMerchantAction(input: unknown): Promise<ActionResult
     return { ok: false, message: merchantError.message };
   }
 
-  const estimatedResidual = Math.round(
-    parsed.data.monthly_volume_estimate * (parsed.data.proposed_rate / 100) * 0.28,
-  );
+  const [processorPricingSettings, compensationRule] = await Promise.all([
+    loadProcessorPricingSettings(supabase),
+    loadCompensationRule(supabase),
+  ]);
+  const residualEstimate = calculateResidualBreakdown({
+    processingVolume: parsed.data.monthly_volume_estimate,
+    proposedRatePercent: parsed.data.proposed_rate,
+    processorName: parsed.data.current_processor,
+    pricingSettings: processorPricingSettings,
+    compensationRule,
+  });
 
   const { error: dealError } = await supabase.from("deals").insert({
     merchant_id: merchant.id,
@@ -368,7 +402,7 @@ export async function createMerchantAction(input: unknown): Promise<ActionResult
     stage: parsed.data.status,
     proposed_rate: parsed.data.proposed_rate,
     estimated_monthly_volume: parsed.data.monthly_volume_estimate,
-    estimated_residual: estimatedResidual,
+    estimated_residual: residualEstimate.netResidual,
     close_probability: parsed.data.status === "processing" ? 100 : 25,
   });
 
@@ -381,7 +415,11 @@ export async function createMerchantAction(input: unknown): Promise<ActionResult
     entityType: "merchant",
     entityId: merchant.id,
     summary: `${profile.full_name} created merchant ${parsed.data.business_name}.`,
-    metadata: { assigned_agent_id: assignedAgentId, status: parsed.data.status },
+    metadata: {
+      assigned_agent_id: assignedAgentId,
+      status: parsed.data.status,
+      processor_pricing: residualEstimate.pricingSnapshot,
+    },
   });
 
   revalidatePath("/dashboard");
@@ -777,16 +815,24 @@ export async function createMerchantOnboardingAction(input: unknown): Promise<Ac
 
   if (merchantError) return { ok: false, message: merchantError.message };
 
-  const estimatedResidual = Math.round(
-    parsed.data.monthly_volume_estimate * (parsed.data.proposed_rate / 100) * 0.28,
-  );
+  const [processorPricingSettings, compensationRule] = await Promise.all([
+    loadProcessorPricingSettings(supabase),
+    loadCompensationRule(supabase),
+  ]);
+  const residualEstimate = calculateResidualBreakdown({
+    processingVolume: parsed.data.monthly_volume_estimate,
+    proposedRatePercent: parsed.data.proposed_rate,
+    processorName: parsed.data.current_processor,
+    pricingSettings: processorPricingSettings,
+    compensationRule,
+  });
   const { error: dealError } = await supabase.from("deals").insert({
     merchant_id: merchant.id,
     agent_id: assignedAgentId,
     stage: merchantStatus,
     proposed_rate: parsed.data.proposed_rate,
     estimated_monthly_volume: parsed.data.monthly_volume_estimate,
-    estimated_residual: estimatedResidual,
+    estimated_residual: residualEstimate.netResidual,
     close_probability: parsed.data.status === "active" ? 100 : 35,
   });
 
@@ -842,7 +888,7 @@ export async function createMerchantOnboardingAction(input: unknown): Promise<Ac
     entityType: "merchant_onboarding_record",
     entityId: data.id,
     summary: `${profile.full_name} started merchant onboarding for ${parsed.data.business_name}.`,
-    metadata: { merchant_id: merchant.id, status: parsed.data.status },
+    metadata: { merchant_id: merchant.id, status: parsed.data.status, processor_pricing: residualEstimate.pricingSnapshot },
   });
 
   revalidateWorkflowPaths();
@@ -1505,6 +1551,159 @@ export async function updateEnterpriseSettingsAction(input: unknown): Promise<Ac
   return { ok: true, message: "Enterprise policy settings saved.", data };
 }
 
+export async function upsertProcessorPricingSettingAction(input: unknown): Promise<ActionResult> {
+  const parsed = ProcessorPricingInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Complete the processor pricing fields." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can manage processor pricing." };
+  }
+
+  const effectiveAt = normalizeDateOnly(parsed.data.effective_at);
+  if (!effectiveAt) {
+    return { ok: false, message: "Choose a valid effective date." };
+  }
+
+  const processorKey = normalizeProcessorKey(parsed.data.processor_name);
+  const previous = parsed.data.id
+    ? (
+        await supabase
+          .from("processor_pricing_settings")
+          .select("*")
+          .eq("id", parsed.data.id)
+          .maybeSingle<ProcessorPricingSetting>()
+      ).data ?? null
+    : null;
+  const payload = {
+    processor_key: processorKey,
+    processor_name: parsed.data.processor_name,
+    pricing_unit: parsed.data.pricing_unit as ProcessorPricingUnit,
+    rate_value: parsed.data.rate_value,
+    flat_fee: parsed.data.flat_fee ?? null,
+    effective_at: effectiveAt,
+    is_active: parsed.data.is_active,
+    notes: parsed.data.notes || null,
+    updated_by: profile.id,
+    ...(parsed.data.id ? {} : { created_by: profile.id }),
+  };
+
+  const write = parsed.data.id
+    ? supabase.from("processor_pricing_settings").update(payload).eq("id", parsed.data.id)
+    : supabase.from("processor_pricing_settings").insert(payload);
+
+  const { data, error } = await write.select("*").single<ProcessorPricingSetting>();
+  if (error) return { ok: false, message: error.message };
+
+  await writeAuditLog(supabase, profile, {
+    action: previous ? "processor_pricing.update" : "processor_pricing.create",
+    entityType: "processor_pricing_setting",
+    entityId: data.id,
+    summary: `${profile.full_name} ${previous ? "updated" : "created"} ${data.processor_name} processor pricing.`,
+    metadata: buildProcessorPricingAuditMetadata({ previous, next: data }),
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/reports");
+  revalidatePath("/compensation");
+  return { ok: true, message: `${data.processor_name} processor pricing saved.`, data };
+}
+
+export async function recalculateProcessorPricingAction(input: unknown): Promise<ActionResult> {
+  const parsed = ProcessorPricingRecalculationInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose valid recalculation options." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (profile.role !== "admin") {
+    return { ok: false, message: "Only admins can recalculate processor pricing." };
+  }
+
+  const data = await getCrmData(supabase);
+  const pricingSettings = data.processorPricingSettings;
+  const dealUpdates = [];
+  const residualUpdates = [];
+  let skippedLockedResiduals = 0;
+
+  if (parsed.data.includeDeals) {
+    for (const deal of data.deals) {
+      if (["processing", "lost", "inactive"].includes(deal.stage)) continue;
+      const merchant = data.merchants.find((item) => item.id === deal.merchant_id);
+      if (!merchant) continue;
+      const estimate = calculateResidualBreakdown({
+        processingVolume: deal.estimated_monthly_volume || merchant.monthly_volume_estimate,
+        proposedRatePercent: deal.proposed_rate || merchant.proposed_rate,
+        processorName: merchant.current_processor,
+        pricingSettings,
+        compensationRule: data.compensationRule,
+        effectiveDate: new Date().toISOString().slice(0, 10),
+      });
+      if (Math.round(Number(deal.estimated_residual || 0) * 100) / 100 === estimate.netResidual) continue;
+      const { error } = await supabase.from("deals").update({ estimated_residual: estimate.netResidual }).eq("id", deal.id);
+      if (!error) dealUpdates.push({ deal_id: deal.id, merchant_id: merchant.id, estimated_residual: estimate.netResidual, processor_pricing: estimate.pricingSnapshot });
+    }
+  }
+
+  if (parsed.data.includeResiduals) {
+    for (const residual of data.residuals) {
+      const protectedResidual = shouldProtectResidualFromRecalculation(data, residual);
+      if (protectedResidual && !parsed.data.includeLockedResiduals) {
+        skippedLockedResiduals += 1;
+        continue;
+      }
+      const merchant = data.merchants.find((item) => item.id === residual.merchant_id);
+      if (!merchant) continue;
+      const patch = recalculateResidualRow({
+        residual,
+        merchant,
+        pricingSettings,
+        compensationRule: data.compensationRule,
+      });
+      const { error } = await supabase.from("residuals").update(patch).eq("id", residual.id);
+      if (!error) {
+        residualUpdates.push({
+          residual_id: residual.id,
+          merchant_id: merchant.id,
+          net_residual: patch.net_residual,
+          processor_cost: patch.processor_cost,
+          protected: protectedResidual,
+        });
+      }
+    }
+  }
+
+  await writeAuditLog(supabase, profile, {
+    action: "processor_pricing.recalculate",
+    entityType: "processor_pricing_setting",
+    summary: `${profile.full_name} recalculated processor pricing effects.`,
+    metadata: {
+      include_deals: parsed.data.includeDeals,
+      include_residuals: parsed.data.includeResiduals,
+      include_locked_residuals: parsed.data.includeLockedResiduals,
+      deal_count: dealUpdates.length,
+      residual_count: residualUpdates.length,
+      skipped_locked_residuals: skippedLockedResiduals,
+      recalculation_triggered: true,
+      deal_updates: dealUpdates.slice(0, 25),
+      residual_updates: residualUpdates.slice(0, 25),
+    },
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  revalidatePath("/compensation");
+  revalidatePath("/analytics");
+  return {
+    ok: true,
+    message: `Recalculated ${dealUpdates.length} deal estimate${dealUpdates.length === 1 ? "" : "s"} and ${residualUpdates.length} residual row${residualUpdates.length === 1 ? "" : "s"}. ${skippedLockedResiduals} locked/exported residual${skippedLockedResiduals === 1 ? "" : "s"} skipped.`,
+    data: { dealUpdates, residualUpdates, skippedLockedResiduals },
+  };
+}
+
 export async function generateFinancialExportAction(input: unknown): Promise<ActionResult> {
   const parsed = FinancialExportInput.safeParse(input);
   if (!parsed.success) {
@@ -1529,6 +1728,8 @@ export async function generateFinancialExportAction(input: unknown): Promise<Act
       filters,
       row_count: exportResult.rows.length,
       total_processing_volume: exportResult.totals.processingVolume,
+      total_gross_processing_revenue: exportResult.totals.grossProcessingRevenue,
+      total_processor_cost: exportResult.totals.processorCost,
       total_net_residual: exportResult.totals.netResidual,
       total_agent_payout: exportResult.totals.agentPayout,
       total_company_share: exportResult.totals.companyShare,
@@ -2047,24 +2248,25 @@ export async function importResidualReportAction(input: unknown): Promise<Action
 
   const batchId = batch?.id ?? null;
 
-  const { data: rules } = await supabase
-    .from("compensation_rules")
-    .select("base_residual_percentage")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const baseResidualPercentage = Number(rules?.[0]?.base_residual_percentage ?? 40);
+  const [processorPricingSettings, compensationRule] = await Promise.all([
+    loadProcessorPricingSettings(supabase),
+    loadCompensationRule(supabase),
+  ]);
+  const baseResidualPercentage = Number(compensationRule.base_residual_percentage ?? 40);
   const errors = [...parsedCsv.errors];
   const residualRows = [];
 
   for (const row of parsedCsv.rows) {
     const merchantQuery = row.merchant_id
-      ? supabase.from("merchants").select("id,assigned_agent_id,business_name").eq("id", row.merchant_id)
-      : supabase.from("merchants").select("id,assigned_agent_id,business_name").ilike("business_name", row.business_name ?? "");
+      ? supabase.from("merchants").select("id,assigned_agent_id,business_name,current_processor,proposed_rate").eq("id", row.merchant_id)
+      : supabase.from("merchants").select("id,assigned_agent_id,business_name,current_processor,proposed_rate").ilike("business_name", row.business_name ?? "");
 
     const { data: merchant, error } = await merchantQuery.maybeSingle<{
       id: string;
       assigned_agent_id: string;
       business_name: string;
+      current_processor: string | null;
+      proposed_rate: number;
     }>();
 
     if (error || !merchant) {
@@ -2074,6 +2276,14 @@ export async function importResidualReportAction(input: unknown): Promise<Action
 
     const netResidual = row.net_residual;
     const agentResidualAmount = netResidual * (baseResidualPercentage / 100);
+    const processorEstimate = calculateResidualBreakdown({
+      processingVolume: row.processing_volume,
+      proposedRatePercent: Number(merchant.proposed_rate || 0),
+      processorName: merchant.current_processor,
+      pricingSettings: processorPricingSettings,
+      compensationRule,
+      effectiveDate: row.month ? normalizeImportMonth(row.month) : statementMonth,
+    });
     residualRows.push({
       merchant_id: merchant.id,
       agent_id: row.agent_id || merchant.assigned_agent_id,
@@ -2082,6 +2292,10 @@ export async function importResidualReportAction(input: unknown): Promise<Action
       net_residual: netResidual,
       agent_residual_amount: agentResidualAmount,
       company_share: netResidual - agentResidualAmount,
+      gross_processing_revenue: processorEstimate.grossProcessingRevenue,
+      processor_cost: processorEstimate.processorCost,
+      processor_pricing_setting_id: processorEstimate.appliedSetting?.id.startsWith("default-") ? null : processorEstimate.appliedSetting?.id ?? null,
+      processor_pricing_snapshot: processorEstimate.pricingSnapshot,
     });
   }
 
@@ -2283,6 +2497,41 @@ async function getCurrentAgentId(supabase: SupabaseClient, profileId: string) {
   return data?.id ?? null;
 }
 
+async function loadProcessorPricingSettings(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("processor_pricing_settings")
+    .select("*")
+    .order("effective_at", { ascending: false })
+    .returns<ProcessorPricingSetting[]>();
+
+  if (error) {
+    console.warn("Processor pricing settings are not available yet.", error.message);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+async function loadCompensationRule(supabase: SupabaseClient) {
+  const { data } = await supabase
+    .from("compensation_rules")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  return data?.[0] ?? {
+    id: "default",
+    rule_name: "MerchantDesk Standard Agent Plan",
+    base_residual_percentage: 40,
+    minimum_processing_rate: 1.5,
+    override_per_active_recruit: 0.25,
+    max_override_per_team: 1,
+    active_recruit_required_merchants: 2,
+    active_recruit_required_processing_days: 90,
+    created_at: new Date(0).toISOString(),
+  };
+}
+
 async function profileIdForAgent(supabase: SupabaseClient, agentId: string) {
   const { data } = await supabase.from("agents").select("profile_id").eq("id", agentId).maybeSingle<{ profile_id: string }>();
   return data?.profile_id ?? null;
@@ -2320,6 +2569,13 @@ function normalizeExportFilters(input: {
     status: input.status && input.status !== "all" ? input.status : undefined,
     processor: input.processor && input.processor !== "all" ? input.processor : undefined,
   };
+}
+
+function normalizeDateOnly(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
 }
 
 async function refreshAgentOnboardingProgress(supabase: SupabaseClient, onboardingId: string) {

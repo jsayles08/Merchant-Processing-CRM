@@ -1,4 +1,5 @@
 import { toCsv } from "@/lib/csv";
+import { calculateProcessorFee } from "@/lib/processor-pricing";
 import type { CrmData, ExportFormat } from "@/lib/types";
 
 export type FinancialExportFilters = {
@@ -21,9 +22,13 @@ export type FinancialExportRow = {
   merchant_status: string;
   processor: string;
   processing_volume: number;
+  gross_processing_revenue: number;
+  processor_cost: number;
   net_residual: number;
   agent_payout: number;
   company_share: number;
+  processor_pricing_source: string;
+  processor_rate: string;
 };
 
 export function generateFinancialExport(data: CrmData, filters: FinancialExportFilters = {}) {
@@ -31,11 +36,13 @@ export function generateFinancialExport(data: CrmData, filters: FinancialExportF
   const totals = rows.reduce(
     (sum, row) => ({
       processingVolume: sum.processingVolume + row.processing_volume,
+      grossProcessingRevenue: sum.grossProcessingRevenue + row.gross_processing_revenue,
+      processorCost: sum.processorCost + row.processor_cost,
       netResidual: sum.netResidual + row.net_residual,
       agentPayout: sum.agentPayout + row.agent_payout,
       companyShare: sum.companyShare + row.company_share,
     }),
-    { processingVolume: 0, netResidual: 0, agentPayout: 0, companyShare: 0 },
+    { processingVolume: 0, grossProcessingRevenue: 0, processorCost: 0, netResidual: 0, agentPayout: 0, companyShare: 0 },
   );
 
   const csvRows = [
@@ -50,9 +57,13 @@ export function generateFinancialExport(data: CrmData, filters: FinancialExportF
       merchant_status: "",
       processor: "",
       processing_volume: roundCurrency(totals.processingVolume),
+      gross_processing_revenue: roundCurrency(totals.grossProcessingRevenue),
+      processor_cost: roundCurrency(totals.processorCost),
       net_residual: roundCurrency(totals.netResidual),
       agent_payout: roundCurrency(totals.agentPayout),
       company_share: roundCurrency(totals.companyShare),
+      processor_pricing_source: "",
+      processor_rate: "",
     },
   ];
 
@@ -60,6 +71,8 @@ export function generateFinancialExport(data: CrmData, filters: FinancialExportF
     rows,
     totals: {
       processingVolume: roundCurrency(totals.processingVolume),
+      grossProcessingRevenue: roundCurrency(totals.grossProcessingRevenue),
+      processorCost: roundCurrency(totals.processorCost),
       netResidual: roundCurrency(totals.netResidual),
       agentPayout: roundCurrency(totals.agentPayout),
       companyShare: roundCurrency(totals.companyShare),
@@ -89,20 +102,39 @@ export function buildFinancialExportRows(data: CrmData, filters: FinancialExport
     })
     .filter(({ merchant }) => !filters.status || merchant?.status === filters.status)
     .filter(({ merchant }) => !filters.processor || (merchant?.current_processor ?? "").toLowerCase() === filters.processor?.toLowerCase())
-    .map(({ residual, merchant, agent, profile }) => ({
-      statement_month: residual.month,
-      agent_name: profile?.full_name ?? agent?.agent_code ?? "Unknown agent",
-      agent_email: profile?.email ?? "",
-      agent_code: agent?.agent_code ?? "",
-      team_number: agent?.team_number ?? "",
-      merchant_name: merchant?.business_name ?? "Unknown merchant",
-      merchant_status: merchant?.status ?? "",
-      processor: merchant?.current_processor ?? "",
-      processing_volume: roundCurrency(residual.processing_volume),
-      net_residual: roundCurrency(residual.net_residual),
-      agent_payout: roundCurrency(residual.agent_residual_amount),
-      company_share: roundCurrency(residual.company_share),
-    }));
+    .map(({ residual, merchant, agent, profile }) => {
+      const processorCalculation = merchant
+        ? calculateProcessorFee({
+            processingVolume: residual.processing_volume,
+            proposedRatePercent: merchant.proposed_rate,
+            processorName: merchant.current_processor,
+            pricingSettings: data.processorPricingSettings,
+            effectiveDate: residual.month,
+          })
+        : null;
+      const snapshot = residual.processor_pricing_snapshot ?? {};
+
+      return {
+        statement_month: residual.month,
+        agent_name: profile?.full_name ?? agent?.agent_code ?? "Unknown agent",
+        agent_email: profile?.email ?? "",
+        agent_code: agent?.agent_code ?? "",
+        team_number: agent?.team_number ?? "",
+        merchant_name: merchant?.business_name ?? "Unknown merchant",
+        merchant_status: merchant?.status ?? "",
+        processor: merchant?.current_processor ?? "",
+        processing_volume: roundCurrency(residual.processing_volume),
+        gross_processing_revenue: roundCurrency(
+          residual.gross_processing_revenue ?? processorCalculation?.grossProcessingRevenue ?? residual.net_residual,
+        ),
+        processor_cost: roundCurrency(residual.processor_cost ?? processorCalculation?.processorCost ?? 0),
+        net_residual: roundCurrency(residual.net_residual),
+        agent_payout: roundCurrency(residual.agent_residual_amount),
+        company_share: roundCurrency(residual.company_share),
+        processor_pricing_source: stringFromSnapshot(snapshot, "pricing_source") ?? processorCalculation?.pricingSource ?? "stored",
+        processor_rate: stringFromSnapshot(snapshot, "rate_label") ?? processorCalculation?.rateLabel ?? "Stored residual",
+      };
+    });
 }
 
 export function buildExportAuditSummary(kind: "financial" | "payroll", rowCount: number, filters: Record<string, unknown>) {
@@ -123,4 +155,9 @@ function isWithinDateRange(value: string, dateFrom?: string, dateTo?: string) {
 
 function roundCurrency(value: number) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function stringFromSnapshot(snapshot: Record<string, unknown>, key: string) {
+  const value = snapshot[key];
+  return typeof value === "string" ? value : null;
 }

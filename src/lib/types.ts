@@ -46,6 +46,7 @@ export type ProcessorProviderId = "fiserv" | "nuvei" | "other";
 export type ProcessorAuthType = "oauth" | "api_key" | "merchant_credentials";
 export type ProcessorConnectionStatus = "pending" | "connected" | "error" | "disconnected" | "syncing";
 export type ProcessorSyncStatus = "queued" | "running" | "success" | "error";
+export type ProcessorPricingUnit = "basis_points" | "percentage" | "flat_fee" | "basis_points_plus_flat" | "percentage_plus_flat";
 export type PresenceStatus = "online" | "away" | "offline";
 export type ActivitySeverity = "info" | "warning" | "error" | "security";
 export type ExportFormat = "csv" | "xlsx";
@@ -261,6 +262,12 @@ export type Residual = {
   net_residual: number;
   agent_residual_amount: number;
   company_share: number;
+  gross_processing_revenue?: number | null;
+  processor_cost?: number | null;
+  processor_pricing_setting_id?: string | null;
+  processor_pricing_snapshot?: Record<string, unknown> | null;
+  calculation_locked?: boolean;
+  recalculated_at?: string | null;
   created_at: string;
 };
 
@@ -380,6 +387,22 @@ export type ProcessorSyncRun = {
   metadata: Record<string, unknown>;
 };
 
+export type ProcessorPricingSetting = {
+  id: string;
+  processor_key: string;
+  processor_name: string;
+  pricing_unit: ProcessorPricingUnit;
+  rate_value: number;
+  flat_fee: number | null;
+  effective_at: string;
+  is_active: boolean;
+  notes: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type FinancialExport = {
   id: string;
   requested_by: string | null;
@@ -387,6 +410,8 @@ export type FinancialExport = {
   filters: Record<string, unknown>;
   row_count: number;
   total_processing_volume: number;
+  total_gross_processing_revenue?: number;
+  total_processor_cost?: number;
   total_net_residual: number;
   total_agent_payout: number;
   total_company_share: number;
@@ -509,6 +534,7 @@ export type CrmData = {
   copilotMemories: CopilotMemory[];
   processorConnections: ProcessorConnection[];
   processorSyncRuns: ProcessorSyncRun[];
+  processorPricingSettings: ProcessorPricingSetting[];
   financialExports: FinancialExport[];
   payrollExports: PayrollExport[];
   payrollIntegrations: PayrollIntegration[];
