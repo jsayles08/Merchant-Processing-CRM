@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
+import { applyOpportunityStageAutomation } from "@/lib/workflow-automation";
 import type {
   MerchantOnboardingRecord,
   MerchantOnboardingStep,
@@ -15,6 +16,7 @@ export type UnderwritingRuleCondition = {
   minAverageTicket?: number;
   maxAverageTicket?: number;
   minProposedRate?: number;
+  maxProposedRate?: number;
   minDocumentCompletionRate?: number;
   maxDocumentCompletionRate?: number;
   riskKeywords?: string[];
@@ -71,6 +73,12 @@ export function validateUnderwritingRule(rule: Pick<UnderwritingRule, "name" | "
   if (conditions.maxDocumentCompletionRate !== undefined && (conditions.maxDocumentCompletionRate < 0 || conditions.maxDocumentCompletionRate > 1)) {
     return "Maximum document completion rate must be between 0 and 1.";
   }
+  const rangeError =
+    validateRange("monthly volume", conditions.minMonthlyVolume, conditions.maxMonthlyVolume) ??
+    validateRange("average ticket", conditions.minAverageTicket, conditions.maxAverageTicket) ??
+    validateRange("proposed rate", conditions.minProposedRate, conditions.maxProposedRate) ??
+    validateRange("document completion rate", conditions.minDocumentCompletionRate, conditions.maxDocumentCompletionRate);
+  if (rangeError) return rangeError;
   return null;
 }
 
@@ -84,11 +92,7 @@ export function evaluateUnderwritingDecision(input: UnderwritingEvaluationInput)
       proposedRate: input.proposedRate ?? null,
     }),
   );
-  const decisiveRule =
-    triggeredRules.find((rule) => rule.outcome === "deny") ??
-    triggeredRules.find((rule) => rule.outcome === "approve") ??
-    triggeredRules.find((rule) => rule.outcome === "manual_review") ??
-    null;
+  const decisiveRule = triggeredRules[0] ?? null;
   const outcome = decisiveRule?.outcome ?? "manual_review";
 
   return {
@@ -142,27 +146,56 @@ export async function evaluateAndPersistUnderwritingDecision(
 
   const status = result.decision === "approved" ? "approved" : result.decision === "declined" ? "declined" : "under_review";
   await supabase.from("merchant_onboarding_records").update({ status }).eq("id", record.id);
-  if (record.merchant_id) {
-    const merchantStatus = result.decision === "approved" ? "approved" : result.decision === "declined" ? "lost" : "underwriting";
-    await supabase.from("merchants").update({ status: merchantStatus }).eq("id", record.merchant_id);
-    await supabase.from("deals").update({ stage: merchantStatus }).eq("merchant_id", record.merchant_id);
+  const triggeredRuleIds = result.triggeredRules.filter((rule) => isUuid(rule.id)).map((rule) => rule.id);
+  const reasons = {
+    reasons: result.reasons,
+    document_completion_rate: result.documentCompletionRate,
+  };
+  const { data: latestDecision } = await supabase
+    .from("underwriting_decisions")
+    .select("id,decision,triggered_rule_ids,reasons")
+    .eq("merchant_onboarding_id", record.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{
+      id: string;
+      decision: UnderwritingDecisionStatus;
+      triggered_rule_ids: string[];
+      reasons: Record<string, unknown>;
+    }>();
+  const reusedDecision = Boolean(
+    latestDecision &&
+      latestDecision.decision === result.decision &&
+      stringArraysMatch(latestDecision.triggered_rule_ids ?? [], triggeredRuleIds) &&
+      latestDecision.reasons?.document_completion_rate === reasons.document_completion_rate,
+  );
+  let decisionId = latestDecision?.id ?? null;
+
+  if (!reusedDecision) {
+    const { data: decision } = await supabase
+      .from("underwriting_decisions")
+      .insert({
+        merchant_onboarding_id: record.id,
+        merchant_id: record.merchant_id,
+        decision: result.decision,
+        triggered_rule_ids: triggeredRuleIds,
+        reasons,
+        evaluated_by: actor.id,
+      })
+      .select("id")
+      .single<{ id: string }>();
+    decisionId = decision?.id ?? null;
   }
 
-  const { data: decision } = await supabase
-    .from("underwriting_decisions")
-    .insert({
-      merchant_onboarding_id: record.id,
-      merchant_id: record.merchant_id,
+  if (record.merchant_id) {
+    await applyOpportunityStageAutomation(supabase, actor, record.merchant_id, {
+      type: "underwriting_decision_recorded",
+      onboardingId: record.id,
+      decisionId,
       decision: result.decision,
-      triggered_rule_ids: result.triggeredRules.filter((rule) => isUuid(rule.id)).map((rule) => rule.id),
-      reasons: {
-        reasons: result.reasons,
-        document_completion_rate: result.documentCompletionRate,
-      },
-      evaluated_by: actor.id,
-    })
-    .select("id")
-    .single<{ id: string }>();
+      source: "underwriting",
+    });
+  }
 
   await writeAuditLog(supabase, actor, {
     action: "underwriting.auto_decision",
@@ -172,11 +205,12 @@ export async function evaluateAndPersistUnderwritingDecision(
     metadata: {
       decision: result.decision,
       triggered_rules: result.triggeredRules.map((rule) => rule.name),
-      decision_id: decision?.id ?? null,
+      decision_id: decisionId,
+      reused_decision: reusedDecision,
     },
   });
 
-  return { record, result, decisionId: decision?.id ?? null };
+  return { record, result, decisionId, reusedDecision };
 }
 
 function normalizeConditions(conditions: Record<string, unknown>): UnderwritingRuleCondition {
@@ -197,6 +231,7 @@ function conditionsMatch(
   if (conditions.minAverageTicket !== undefined && context.record.average_ticket < conditions.minAverageTicket) return false;
   if (conditions.maxAverageTicket !== undefined && context.record.average_ticket > conditions.maxAverageTicket) return false;
   if (conditions.minProposedRate !== undefined && (context.proposedRate ?? 0) < conditions.minProposedRate) return false;
+  if (conditions.maxProposedRate !== undefined && (context.proposedRate ?? 0) > conditions.maxProposedRate) return false;
   if (conditions.minDocumentCompletionRate !== undefined && context.documentCompletionRate < conditions.minDocumentCompletionRate) return false;
   if (conditions.maxDocumentCompletionRate !== undefined && context.documentCompletionRate > conditions.maxDocumentCompletionRate) return false;
 
@@ -222,4 +257,18 @@ function summarizeConditions(conditions: Record<string, unknown>) {
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function validateRange(label: string, min: number | undefined, max: number | undefined) {
+  if (min !== undefined && max !== undefined && min > max) {
+    return `Minimum ${label} cannot be greater than maximum ${label}.`;
+  }
+  return null;
+}
+
+function stringArraysMatch(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  const normalizedLeft = [...left].sort();
+  const normalizedRight = [...right].sort();
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
 }

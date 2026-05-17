@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StatusBadge } from "@/components/merchants/merchant-manager";
 import { updateMerchantStatusAction } from "@/lib/actions";
 import { pipelineStages } from "@/lib/demo-data";
-import type { CrmData, Merchant, MerchantStatus } from "@/lib/types";
+import type { AuditLog, CrmData, Merchant, MerchantStatus } from "@/lib/types";
 import { currency, daysBetween, percent } from "@/lib/utils";
 
 export function PipelineBoard({ data }: { data: CrmData }) {
@@ -26,6 +26,7 @@ export function PipelineBoard({ data }: { data: CrmData }) {
       ),
     [data.agents, data.profiles],
   );
+  const autoTransitions = useMemo(() => buildAutoTransitionMap(data.auditLogs), [data.auditLogs]);
 
   function handleDragEnd(event: DragEndEvent) {
     const merchantId = String(event.active.id);
@@ -65,13 +66,20 @@ export function PipelineBoard({ data }: { data: CrmData }) {
                   const stageMerchants = merchants.filter((merchant) => merchant.status === stage.id);
 
                   return (
-                    <StageColumn key={stage.id} id={stage.id} title={stage.label} merchants={stageMerchants} agentNames={agentNames} />
+                    <StageColumn
+                      key={stage.id}
+                      id={stage.id}
+                      title={stage.label}
+                      merchants={stageMerchants}
+                      agentNames={agentNames}
+                      autoTransitions={autoTransitions}
+                    />
                   );
                 })}
               </div>
             </DndContext>
           ) : (
-            <StaticPipeline merchants={merchants} agentNames={agentNames} />
+            <StaticPipeline merchants={merchants} agentNames={agentNames} autoTransitions={autoTransitions} />
           )}
         </CardContent>
       </Card>
@@ -79,7 +87,15 @@ export function PipelineBoard({ data }: { data: CrmData }) {
   );
 }
 
-function StaticPipeline({ merchants, agentNames }: { merchants: Merchant[]; agentNames: Map<string, string> }) {
+function StaticPipeline({
+  merchants,
+  agentNames,
+  autoTransitions,
+}: {
+  merchants: Merchant[];
+  agentNames: Map<string, string>;
+  autoTransitions: Map<string, AutoTransitionSummary>;
+}) {
   return (
     <div className="grid gap-4 overflow-x-auto pb-2 xl:grid-cols-3 2xl:grid-cols-5">
       {pipelineStages.map((stage) => {
@@ -96,6 +112,9 @@ function StaticPipeline({ merchants, agentNames }: { merchants: Merchant[]; agen
                 <article key={merchant.id} className="rounded-[22px] border border-[#ABB7C0]/25 bg-white/80 p-3 shadow-sm">
                   <p className="truncate text-sm font-semibold text-[#0B0F15]">{merchant.business_name}</p>
                   <p className="mt-1 text-xs text-[#25425E]/70">{agentNames.get(merchant.assigned_agent_id) ?? "Unassigned"}</p>
+                  {autoTransitions.get(merchant.id) ? (
+                    <p className="mt-2 text-xs font-medium text-[#0E5EC9]">{autoTransitions.get(merchant.id)?.label}</p>
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -111,11 +130,13 @@ function StageColumn({
   title,
   merchants,
   agentNames,
+  autoTransitions,
 }: {
   id: MerchantStatus;
   title: string;
   merchants: Merchant[];
   agentNames: Map<string, string>;
+  autoTransitions: Map<string, AutoTransitionSummary>;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
 
@@ -135,14 +156,27 @@ function StageColumn({
       </div>
       <div className="space-y-3">
         {merchants.map((merchant) => (
-          <MerchantPipelineCard key={merchant.id} merchant={merchant} agentName={agentNames.get(merchant.assigned_agent_id) ?? "Unassigned"} />
+          <MerchantPipelineCard
+            key={merchant.id}
+            merchant={merchant}
+            agentName={agentNames.get(merchant.assigned_agent_id) ?? "Unassigned"}
+            autoTransition={autoTransitions.get(merchant.id)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function MerchantPipelineCard({ merchant, agentName }: { merchant: Merchant; agentName: string }) {
+function MerchantPipelineCard({
+  merchant,
+  agentName,
+  autoTransition,
+}: {
+  merchant: Merchant;
+  agentName: string;
+  autoTransition?: AutoTransitionSummary;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: merchant.id });
   const style = transform
     ? {
@@ -177,6 +211,12 @@ function MerchantPipelineCard({ merchant, agentName }: { merchant: Merchant; age
         <StatusBadge status={merchant.status} />
         {merchant.proposed_rate < 1.5 ? <Badge tone="amber">Below floor</Badge> : null}
       </div>
+      {autoTransition ? (
+        <div className="mt-3 rounded-2xl border border-[#0E5EC9]/15 bg-[#0E5EC9]/8 px-3 py-2 text-xs text-[#25425E]">
+          <span className="font-semibold text-[#0E5EC9]">{autoTransition.label}</span>
+          <span className="block pt-1 text-[#25425E]/70">{autoTransition.reason}</span>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -188,4 +228,34 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-semibold text-[#0B0F15]">{value}</p>
     </div>
   );
+}
+
+type AutoTransitionSummary = {
+  label: string;
+  reason: string;
+};
+
+function buildAutoTransitionMap(auditLogs: AuditLog[]) {
+  const map = new Map<string, AutoTransitionSummary>();
+
+  for (const log of auditLogs) {
+    if (log.action !== "merchant.stage_auto_advance" || !log.entity_id || map.has(log.entity_id)) continue;
+    const metadata = log.metadata ?? {};
+    const newStage = typeof metadata.new_stage === "string" ? metadata.new_stage : "next stage";
+    const reason = typeof metadata.reason === "string" ? metadata.reason : "Triggered by CRM workflow automation.";
+    map.set(log.entity_id, {
+      label: `Auto moved to ${titleCase(newStage)}`,
+      reason,
+    });
+  }
+
+  return map;
+}
+
+function titleCase(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BrainCircuit, Play, Save, ShieldAlert } from "lucide-react";
+import { BrainCircuit, Play, PlusCircle, Save, ShieldAlert, Trash2 } from "lucide-react";
 import { runUnderwritingDecisionAction, saveUnderwritingRulesAction } from "@/lib/actions";
 import type { CrmData, UnderwritingOutcome, UnderwritingRule } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,10 @@ export function UnderwritingSettings({ data }: { data: CrmData }) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const [rules, setRules] = useState<RuleDraft[]>(() => data.underwritingRules.map(toDraft));
+  const [deletedRuleIds, setDeletedRuleIds] = useState<string[]>([]);
+  const [autoDecisionsEnabled, setAutoDecisionsEnabled] = useState(
+    () => data.enterpriseSettings.find((setting) => setting.setting_key === "underwriting_auto_decisions_enabled")?.setting_value?.enabled !== false,
+  );
   const pendingApplications = data.merchantOnboardingRecords.filter((record) =>
     ["application_started", "documents_needed", "under_review"].includes(record.status),
   );
@@ -41,13 +45,47 @@ export function UnderwritingSettings({ data }: { data: CrmData }) {
     setRules((current) => current.map((rule, ruleIndex) => (ruleIndex === index ? { ...rule, [key]: value } : rule)));
   }
 
+  function addRule() {
+    setRules((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        name: "New underwriting rule",
+        outcome: "manual_review",
+        enabled: true,
+        priority: current.length ? Math.min(999, Math.max(...current.map((rule) => rule.priority)) + 10) : 100,
+        minMonthlyVolume: "",
+        maxMonthlyVolume: "",
+        minAverageTicket: "",
+        maxAverageTicket: "",
+        minProposedRate: "",
+        maxProposedRate: "",
+        minDocumentCompletionRate: "",
+        maxDocumentCompletionRate: "",
+        riskKeywords: "",
+      },
+    ]);
+  }
+
+  function removeRule(rule: RuleDraft) {
+    setRules((current) => current.filter((item) => item.id !== rule.id));
+    if (data.underwritingRules.some((item) => item.id === rule.id)) {
+      setDeletedRuleIds((current) => [...new Set([...current, rule.id])]);
+    }
+  }
+
   function saveRules() {
     startTransition(async () => {
       const result = await saveUnderwritingRulesAction({
         rules: rules.map(fromDraft),
+        deletedRuleIds,
+        autoDecisionsEnabled,
       });
       setMessage(result.message);
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        setDeletedRuleIds([]);
+        router.refresh();
+      }
     });
   }
 
@@ -73,9 +111,22 @@ export function UnderwritingSettings({ data }: { data: CrmData }) {
                 <ShieldAlert className="h-3.5 w-3.5" />
                 {pendingApplications.length} pending
               </Badge>
+              <label className="inline-flex h-10 items-center gap-2 rounded-full border border-[#ABB7C0]/35 bg-white/65 px-3 text-sm font-semibold text-[#25425E]">
+                <input
+                  className="h-4 w-4 accent-[#0E5EC9]"
+                  type="checkbox"
+                  checked={autoDecisionsEnabled}
+                  onChange={(event) => setAutoDecisionsEnabled(event.target.checked)}
+                />
+                Auto decisions
+              </label>
               <Button type="button" variant="secondary" onClick={runAll} disabled={isPending || !pendingApplications.length}>
                 <Play className="h-4 w-4" />
                 Run Decisions
+              </Button>
+              <Button type="button" variant="secondary" onClick={addRule} disabled={isPending}>
+                <PlusCircle className="h-4 w-4" />
+                Add Rule
               </Button>
               <Button type="button" onClick={saveRules} disabled={isPending || !rules.length}>
                 <Save className="h-4 w-4" />
@@ -136,6 +187,12 @@ export function UnderwritingSettings({ data }: { data: CrmData }) {
               <Field label="Risk keywords">
                 <Input value={rule.riskKeywords} onChange={(event) => update(index, "riskKeywords", event.target.value)} placeholder="fraud, match list, terminated merchant file" />
               </Field>
+              <div className="mt-4 flex justify-end">
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeRule(rule)} disabled={isPending || rules.length === 1}>
+                  <Trash2 className="h-4 w-4" />
+                  Remove
+                </Button>
+              </div>
             </div>
           ))}
           {!rules.length ? (

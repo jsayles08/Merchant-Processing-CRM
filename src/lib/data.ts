@@ -50,6 +50,7 @@ export type MerchantDetailData = {
   tasks: Task[];
   documents: Document[];
   residuals: Residual[];
+  auditLogs: AuditLog[];
 };
 
 const defaultRule = demoData.compensationRule;
@@ -198,13 +199,14 @@ export async function getMerchantDetailData(
 
   if (error || !merchant) return null;
 
-  const [deal, assignedAgent, updates, tasks, documents, residuals] = await Promise.all([
+  const [deal, assignedAgent, updates, tasks, documents, residuals, auditLogs] = await Promise.all([
     maybeSingle<Deal>(supabase, "deals", "merchant_id", merchantId),
     maybeSingle<Agent>(supabase, "agents", "id", merchant.assigned_agent_id),
     selectWhere<MerchantUpdate>(supabase, "merchant_updates", "merchant_id", merchantId, "created_at", false),
     selectWhere<Task>(supabase, "tasks", "merchant_id", merchantId, "due_date"),
     selectWhere<Document>(supabase, "documents", "merchant_id", merchantId, "created_at", false),
     selectWhere<Residual>(supabase, "residuals", "merchant_id", merchantId, "month", false),
+    selectWhere<AuditLog>(supabase, "audit_logs", "entity_id", merchantId, "created_at", false),
   ]);
 
   let assignedProfile: Profile | null = null;
@@ -221,6 +223,7 @@ export async function getMerchantDetailData(
     tasks,
     documents: await signMerchantDocuments(supabase, documents),
     residuals,
+    auditLogs,
   };
 }
 

@@ -33,6 +33,10 @@ import {
   evaluateAndPersistUnderwritingDecision,
   validateUnderwritingRule,
 } from "@/lib/underwriting";
+import {
+  applyOpportunityStageAutomation,
+  updateOpportunityStage,
+} from "@/lib/workflow-automation";
 import type {
   AgentOnboardingRecord,
   AgentOnboardingStep,
@@ -331,6 +335,8 @@ const UnderwritingRuleInput = z.object({
 
 const UnderwritingRulesInput = z.object({
   rules: z.array(UnderwritingRuleInput).min(1),
+  deletedRuleIds: z.array(z.string().uuid()).default([]),
+  autoDecisionsEnabled: z.boolean().optional(),
 });
 
 const UnderwritingRunInput = z.object({
@@ -428,29 +434,19 @@ export async function createMerchantAction(input: unknown): Promise<ActionResult
 
 export async function updateMerchantStatusAction(merchantId: string, status: MerchantStatus): Promise<ActionResult> {
   const { supabase, profile } = await getSessionContext();
-  const { error: merchantError } = await supabase.from("merchants").update({ status }).eq("id", merchantId);
-
-  if (merchantError) {
-    return { ok: false, message: merchantError.message };
-  }
-
-  const { error: dealError } = await supabase.from("deals").update({ stage: status }).eq("merchant_id", merchantId);
-
-  if (dealError) {
-    return { ok: false, message: dealError.message };
-  }
-
-  await writeAuditLog(supabase, profile, {
-    action: "merchant.status_update",
-    entityType: "merchant",
-    entityId: merchantId,
-    summary: `${profile.full_name} moved a merchant to ${status}.`,
+  const transition = await updateOpportunityStage(supabase, profile, {
+    merchantId,
+    newStage: status,
+    reason: "Manual pipeline stage update.",
+    triggerEvent: "manual_stage_update",
+    automatic: false,
     metadata: { status },
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/opportunities");
   revalidatePath(`/merchants/${merchantId}`);
-  return { ok: true, message: "Merchant stage updated." };
+  return { ok: true, message: transition ? "Merchant stage updated." : "Merchant was already in that stage." };
 }
 
 export async function deleteMerchantAction(merchantId: string): Promise<ActionResult> {
@@ -918,11 +914,12 @@ export async function updateMerchantOnboardingStatusAction(input: unknown): Prom
 
   if (error) return { ok: false, message: error.message };
 
-  if (data.merchant_id) {
-    const mappedStatus = mapMerchantOnboardingStatus(parsed.data.status);
-    await supabase.from("merchants").update({ status: mappedStatus }).eq("id", data.merchant_id);
-    await supabase.from("deals").update({ stage: mappedStatus }).eq("merchant_id", data.merchant_id);
-  }
+  const stageTransition = await applyOpportunityStageAutomation(supabase, profile, data.merchant_id, {
+    type: "merchant_onboarding_status_changed",
+    onboardingId: data.id,
+    onboardingStatus: parsed.data.status,
+    source: "merchant_onboarding",
+  });
 
   if (followUpAt && data.assigned_agent_id) {
     const assignedProfileId = await profileIdForAgent(supabase, data.assigned_agent_id);
@@ -975,7 +972,13 @@ export async function updateMerchantOnboardingStatusAction(input: unknown): Prom
   }
 
   revalidateWorkflowPaths();
-  return { ok: true, message: "Merchant onboarding updated.", data };
+  return {
+    ok: true,
+    message: stageTransition
+      ? `Merchant onboarding updated. Pipeline moved to ${stageTransition.newStage}.`
+      : "Merchant onboarding updated.",
+    data,
+  };
 }
 
 export async function updateMerchantOnboardingStepAction(input: unknown): Promise<ActionResult> {
@@ -1066,8 +1069,27 @@ export async function createSignatureRequestAction(input: unknown): Promise<Acti
     metadata: { status, provider: data.provider, related_entity_type: parsed.data.related_entity_type },
   });
 
+  const stageTransition =
+    status === "sent" && data.related_entity_type === "merchant"
+      ? await applyOpportunityStageAutomation(supabase, profile, data.related_entity_id, {
+          type: "signature_request_sent",
+          signatureRequestId: data.id,
+          signatureStatus: status,
+          relatedEntityType: data.related_entity_type,
+          source: "signature_request",
+        })
+      : null;
+
   revalidateWorkflowPaths();
-  return { ok: true, message: status === "sent" ? "Signature request sent." : "Signature draft saved.", data };
+  return {
+    ok: true,
+    message: stageTransition
+      ? `Signature request sent. Pipeline moved to ${stageTransition.newStage}.`
+      : status === "sent"
+        ? "Signature request sent."
+        : "Signature draft saved.",
+    data,
+  };
 }
 
 export async function updateSignatureRequestStatusAction(input: unknown): Promise<ActionResult> {
@@ -1101,8 +1123,23 @@ export async function updateSignatureRequestStatusAction(input: unknown): Promis
     metadata: { status: parsed.data.status },
   });
 
+  const stageTransition =
+    parsed.data.status === "sent" && data.related_entity_type === "merchant"
+      ? await applyOpportunityStageAutomation(supabase, profile, data.related_entity_id, {
+          type: "signature_request_sent",
+          signatureRequestId: data.id,
+          signatureStatus: parsed.data.status,
+          relatedEntityType: data.related_entity_type,
+          source: "signature_request",
+        })
+      : null;
+
   revalidateWorkflowPaths();
-  return { ok: true, message: "Signature status updated.", data };
+  return {
+    ok: true,
+    message: stageTransition ? `Signature status updated. Pipeline moved to ${stageTransition.newStage}.` : "Signature status updated.",
+    data,
+  };
 }
 
 export async function createMerchantUpdateAction(formData: FormData): Promise<ActionResult> {
@@ -1122,13 +1159,17 @@ export async function createMerchantUpdateAction(formData: FormData): Promise<Ac
     return { ok: false, message: "Only users with agent records can create merchant updates." };
   }
 
-  const { error } = await supabase.from("merchant_updates").insert({
-    merchant_id: merchantId,
-    agent_id: currentAgent.id,
-    update_type: updateType,
-    note,
-    next_follow_up_date: nextFollowUpDate || null,
-  });
+  const { data: update, error } = await supabase
+    .from("merchant_updates")
+    .insert({
+      merchant_id: merchantId,
+      agent_id: currentAgent.id,
+      update_type: updateType,
+      note,
+      next_follow_up_date: nextFollowUpDate || null,
+    })
+    .select("id")
+    .single<{ id: string }>();
 
   if (error) return { ok: false, message: error.message };
 
@@ -1140,9 +1181,20 @@ export async function createMerchantUpdateAction(formData: FormData): Promise<Ac
     metadata: { update_type: updateType, next_follow_up_date: nextFollowUpDate || null },
   });
 
+  const stageTransition = await applyOpportunityStageAutomation(supabase, profile, merchantId, {
+    type: "merchant_update_logged",
+    updateType,
+    updateId: update?.id ?? null,
+    source: "merchant_update",
+  });
+
   revalidatePath("/dashboard");
+  revalidatePath("/opportunities");
   revalidatePath(`/merchants/${merchantId}`);
-  return { ok: true, message: "Merchant update saved." };
+  return {
+    ok: true,
+    message: stageTransition ? `Merchant update saved. Pipeline moved to ${stageTransition.newStage}.` : "Merchant update saved.",
+  };
 }
 
 export async function approveDealAction(dealId: string, approvalStatus: "approved" | "denied"): Promise<ActionResult> {
@@ -2144,6 +2196,15 @@ export async function saveUnderwritingRulesAction(input: unknown): Promise<Actio
     updated_at: new Date().toISOString(),
   }));
 
+  if (parsed.data.deletedRuleIds.length) {
+    const { error: deleteError } = await supabase
+      .from("underwriting_rules")
+      .delete()
+      .in("id", parsed.data.deletedRuleIds);
+
+    if (deleteError) return { ok: false, message: deleteError.message };
+  }
+
   const { data, error } = await supabase
     .from("underwriting_rules")
     .upsert(rows, { onConflict: "id" })
@@ -2151,11 +2212,33 @@ export async function saveUnderwritingRulesAction(input: unknown): Promise<Actio
 
   if (error) return { ok: false, message: error.message };
 
+  if (parsed.data.autoDecisionsEnabled !== undefined) {
+    const { error: settingsError } = await supabase
+      .from("enterprise_settings")
+      .upsert(
+        {
+          setting_key: "underwriting_auto_decisions_enabled",
+          setting_value: { enabled: parsed.data.autoDecisionsEnabled },
+          description: "Allow underwriting rules to automatically approve, decline, or route applications to manual review.",
+          updated_by: profile.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "setting_key" },
+      );
+
+    if (settingsError) return { ok: false, message: settingsError.message };
+  }
+
   await writeAuditLog(supabase, profile, {
     action: "underwriting.rules_update",
     entityType: "underwriting_rule",
     summary: `${profile.full_name} updated underwriting automation rules.`,
-    metadata: { rule_count: rows.length, enabled_count: rows.filter((rule) => rule.enabled).length },
+    metadata: {
+      rule_count: rows.length,
+      enabled_count: rows.filter((rule) => rule.enabled).length,
+      deleted_rule_count: parsed.data.deletedRuleIds.length,
+      auto_decisions_enabled: parsed.data.autoDecisionsEnabled ?? null,
+    },
   });
 
   revalidatePath("/settings");
@@ -2202,6 +2285,7 @@ export async function runUnderwritingDecisionAction(input: unknown): Promise<Act
 
   revalidatePath("/settings");
   revalidatePath("/merchant-onboarding");
+  revalidatePath("/opportunities");
   revalidatePath("/analytics");
   return {
     ok: results.every((result) => !("error" in result)),
@@ -2610,6 +2694,7 @@ function mapMerchantOnboardingStatus(status: MerchantOnboardingStatus): Merchant
 
 function revalidateWorkflowPaths() {
   revalidatePath("/dashboard");
+  revalidatePath("/opportunities");
   revalidatePath("/recruitment");
   revalidatePath("/agent-onboarding");
   revalidatePath("/merchant-onboarding");

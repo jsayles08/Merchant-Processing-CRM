@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, FileUp, Mail, Phone, ReceiptText } from "lucide-react";
+import { ArrowLeft, CalendarClock, FileUp, GitBranch, Mail, Phone, ReceiptText } from "lucide-react";
 import { createMerchantUpdateAction, uploadMerchantDocumentAction } from "@/lib/actions";
 import { getMerchantDetailData } from "@/lib/data";
 import { getCrmPageContext } from "@/lib/page-context";
@@ -32,6 +32,7 @@ export default async function MerchantProfilePage({
     compensationRule: data.compensationRule,
   }).netResidual;
   const estimatedResidual = detail.deal?.estimated_residual ?? fallbackResidual;
+  const automationLogs = detail.auditLogs.filter((log) => log.action === "merchant.stage_auto_advance").slice(0, 4);
   async function saveMerchantUpdate(formData: FormData) {
     "use server";
     await createMerchantUpdateAction(formData);
@@ -142,6 +143,26 @@ export default async function MerchantProfilePage({
                   </div>
                 ))}
               </div>
+
+              {automationLogs.length ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[#0B0F15]">
+                    <GitBranch className="h-4 w-4 text-[#0E5EC9]" />
+                    Pipeline automation
+                  </div>
+                  {automationLogs.map((log) => (
+                    <div key={log.id} className="rounded-2xl border border-[#0E5EC9]/15 bg-[#0E5EC9]/8 p-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Badge tone="blue">{titleCase(String(log.metadata.new_stage ?? "updated"))}</Badge>
+                        <span className="text-xs text-[#25425E]/65">{new Date(log.created_at).toLocaleString()}</span>
+                      </div>
+                      <p className="mt-2 text-[#25425E]">
+                        {typeof log.metadata.reason === "string" ? log.metadata.reason : "CRM workflow automation moved this opportunity."}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 

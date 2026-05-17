@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
 import { calculateResidualBreakdown } from "@/lib/processor-pricing";
+import { applyOpportunityStageAutomation, updateOpportunityStage } from "@/lib/workflow-automation";
 import type { CompensationRule, CopilotAction, MerchantStatus, ProcessorPricingSetting } from "@/lib/types";
 
 const merchantStatuses: MerchantStatus[] = [
@@ -130,10 +131,14 @@ export async function POST(
 
   if (action.action_type === "update_stage" && merchantId && typeof payload.status === "string" && isMerchantStatus(payload.status)) {
     const status = payload.status as MerchantStatus;
-    const merchantUpdate = await supabase.from("merchants").update({ status }).eq("id", merchantId);
-    if (merchantUpdate.error) throw merchantUpdate.error;
-
-    await supabase.from("deals").update({ stage: status }).eq("merchant_id", merchantId);
+    await updateOpportunityStage(supabase, profile, {
+      merchantId,
+      newStage: status,
+      reason: "Manual Copilot-confirmed pipeline stage update.",
+      triggerEvent: "copilot_stage_update",
+      automatic: false,
+      metadata: { action_id: action.id, action_type: action.action_type },
+    });
     completionMessage = "Merchant stage updated.";
     completed = true;
   }
@@ -162,15 +167,25 @@ export async function POST(
     const note = typeof payload.note === "string" ? payload.note : action.action_summary;
     const updateType = typeof payload.update_type === "string" ? payload.update_type : "note";
 
-    const update = await supabase.from("merchant_updates").insert({
-      merchant_id: merchantId,
-      agent_id: actionAgentId,
-      update_type: updateType,
-      note,
-      next_follow_up_date: parseDueDate(payload.next_follow_up_date),
-    });
+    const update = await supabase
+      .from("merchant_updates")
+      .insert({
+        merchant_id: merchantId,
+        agent_id: actionAgentId,
+        update_type: updateType,
+        note,
+        next_follow_up_date: parseDueDate(payload.next_follow_up_date),
+      })
+      .select("id")
+      .single<{ id: string }>();
 
     if (update.error) throw update.error;
+    await applyOpportunityStageAutomation(supabase, profile, merchantId, {
+      type: "merchant_update_logged",
+      updateType,
+      updateId: update.data?.id ?? null,
+      source: "copilot",
+    });
     completionMessage = "Merchant update added.";
     completed = true;
   }
@@ -237,6 +252,10 @@ export async function POST(
       if (dealUpdate.error) throw dealUpdate.error;
     }
 
+    await applyOpportunityStageAutomation(supabase, profile, merchantId, {
+      type: "merchant_profile_updated",
+      source: "copilot",
+    });
     completionMessage = "Merchant profile updated.";
     completed = true;
   }
@@ -324,22 +343,37 @@ export async function POST(
       return NextResponse.json({ ok: false, message: "Recipient email is required before Copilot can create a signature request." }, { status: 400 });
     }
 
-    const { error: signatureError } = await supabase.from("signature_requests").insert({
-      title: typeof payload.title === "string" ? payload.title : "Signature request",
-      recipient_name: typeof payload.recipient_name === "string" ? payload.recipient_name : "Recipient",
-      recipient_email: recipientEmail,
-      recipient_profile_id: typeof payload.recipient_profile_id === "string" ? payload.recipient_profile_id : null,
-      related_entity_type: isSignatureEntityType(payload.related_entity_type) ? payload.related_entity_type : "merchant",
-      related_entity_id: typeof payload.related_entity_id === "string" ? payload.related_entity_id : merchantId,
-      document_id: typeof payload.document_id === "string" ? payload.document_id : null,
-      provider: "manual",
-      status: payload.send_now === false ? "draft" : "sent",
-      metadata: { created_by_copilot: true, summary: action.action_summary },
-      created_by: profile.id,
-      sent_at: payload.send_now === false ? null : new Date().toISOString(),
-    });
+    const relatedEntityType = isSignatureEntityType(payload.related_entity_type) ? payload.related_entity_type : "merchant";
+    const signatureStatus = payload.send_now === false ? "draft" : "sent";
+    const { data: signature, error: signatureError } = await supabase
+      .from("signature_requests")
+      .insert({
+        title: typeof payload.title === "string" ? payload.title : "Signature request",
+        recipient_name: typeof payload.recipient_name === "string" ? payload.recipient_name : "Recipient",
+        recipient_email: recipientEmail,
+        recipient_profile_id: typeof payload.recipient_profile_id === "string" ? payload.recipient_profile_id : null,
+        related_entity_type: relatedEntityType,
+        related_entity_id: typeof payload.related_entity_id === "string" ? payload.related_entity_id : merchantId,
+        document_id: typeof payload.document_id === "string" ? payload.document_id : null,
+        provider: "manual",
+        status: signatureStatus,
+        metadata: { created_by_copilot: true, summary: action.action_summary },
+        created_by: profile.id,
+        sent_at: payload.send_now === false ? null : new Date().toISOString(),
+      })
+      .select("id,related_entity_id")
+      .single<{ id: string; related_entity_id: string | null }>();
 
     if (signatureError) throw signatureError;
+    if (signatureStatus === "sent" && relatedEntityType === "merchant") {
+      await applyOpportunityStageAutomation(supabase, profile, signature?.related_entity_id ?? merchantId, {
+        type: "signature_request_sent",
+        signatureRequestId: signature?.id ?? action.id,
+        signatureStatus,
+        relatedEntityType,
+        source: "copilot",
+      });
+    }
     completionMessage = "Signature request created.";
     completed = true;
   }
@@ -395,6 +429,7 @@ export async function POST(
   revalidatePath("/copilot");
   revalidatePath("/messages");
   revalidatePath("/merchants");
+  revalidatePath("/opportunities");
   revalidatePath("/recruitment");
   revalidatePath("/merchant-onboarding");
   revalidatePath("/documents");

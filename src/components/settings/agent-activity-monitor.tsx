@@ -132,29 +132,31 @@ export function AgentActivityMonitor({ data }: { data: CrmData }) {
           </div>
 
           {filteredLogs.length ? (
-            <div className="space-y-2">
-              {filteredLogs.slice(0, 80).map((log) => {
-                const profile = profilesById.get(log.profile_id ?? "");
-                return (
-                  <div key={log.id} className="crm-panel grid gap-3 rounded-[22px] p-4 lg:grid-cols-[1fr_auto] lg:items-center">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <SeverityIcon log={log} />
-                        <p className="font-semibold text-[#0B0F15]">{log.summary}</p>
-                        <Badge tone={severityTone(log.severity)}>{log.severity}</Badge>
-                        {log.provider ? <Badge tone="slate">{log.provider}</Badge> : null}
+            <div className="max-h-[560px] overflow-y-auto rounded-[24px] pr-2">
+              <div className="space-y-2">
+                {filteredLogs.slice(0, 80).map((log) => {
+                  const profile = profilesById.get(log.profile_id ?? "");
+                  return (
+                    <div key={log.id} className="crm-panel grid gap-3 rounded-[22px] p-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <SeverityIcon log={log} />
+                          <p className="font-semibold text-[#0B0F15]">{log.summary}</p>
+                          <Badge tone={severityTone(log.severity)}>{log.severity}</Badge>
+                          {log.provider ? <Badge tone="slate">{log.provider}</Badge> : null}
+                        </div>
+                        <p className="mt-1 text-sm text-[#25425E]/70">
+                          {profile?.full_name ?? "System"} · {log.event_type} · {log.event_source}
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-[#25425E]/70">
-                        {profile?.full_name ?? "System"} · {log.event_type} · {log.event_source}
-                      </p>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[#25425E]/70">
+                        <Clock3 className="h-4 w-4" />
+                        {formatDateTime(log.created_at)}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-[#25425E]/70">
-                      <Clock3 className="h-4 w-4" />
-                      {formatDateTime(log.created_at)}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <EmptyState
