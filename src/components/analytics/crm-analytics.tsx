@@ -33,15 +33,15 @@ export function CrmAnalytics({ data, currentProfile, compact = false }: { data: 
     data.tasks.length;
 
   return (
-    <section className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="crm-dashboard-analytics space-y-6">
+      <div className="crm-dashboard-analytics-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={<UsersRound className="h-4 w-4" />} label={currentProfile?.role === "admin" ? "Total agents" : "Visible agents"} value={analytics.metrics.totalAgents} accent={`${analytics.metrics.activeAgents} active`} />
         <MetricCard icon={<UserPlus className="h-4 w-4" />} label="Recruits" value={analytics.metrics.totalRecruits} accent={`${analytics.metrics.recruitsPerTeam} per team`} />
         <MetricCard icon={<TrendingUp className="h-4 w-4" />} label="Recruit conversion" value={`${analytics.metrics.recruitConversionRate}%`} accent="active agents" />
         <MetricCard icon={<CheckCircle2 className="h-4 w-4" />} label="Agent onboarding" value={`${analytics.metrics.agentOnboardingCompletion}%`} accent="completion" />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="crm-dashboard-analytics-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={<ClipboardList className="h-4 w-4" />} label="Applications" value={analytics.metrics.applicationCount} accent={`${analytics.metrics.approvalRate}% approved`} />
         <MetricCard icon={<BarChart3 className="h-4 w-4" />} label="Denial rate" value={`${analytics.metrics.denialRate}%`} accent={`${analytics.metrics.activeMerchantPipeline} active`} />
         <MetricCard icon={<DollarSign className="h-4 w-4" />} label="Payroll total" value={currency(analytics.metrics.payrollTotal)} accent="visible scope" />
@@ -56,7 +56,7 @@ export function CrmAnalytics({ data, currentProfile, compact = false }: { data: 
         />
       ) : null}
 
-      <div className={`grid gap-6 ${compact ? "xl:grid-cols-2" : "xl:grid-cols-[1.1fr_0.9fr]"}`}>
+      <div className={`crm-dashboard-chart-grid grid gap-6 ${compact ? "xl:grid-cols-2" : "xl:grid-cols-[1.1fr_0.9fr]"}`}>
         <ChartCard title="Recruitment Pipeline" description="Agent recruits grouped by stage.">
           <StatusBarChart data={analytics.recruitStatus} />
         </ChartCard>
@@ -67,7 +67,7 @@ export function CrmAnalytics({ data, currentProfile, compact = false }: { data: 
       </div>
 
       {!compact ? (
-        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="crm-dashboard-chart-grid grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <ChartCard title="Agent Onboarding Completion" description="Current completion posture by onboarding status.">
             <StatusBarChart data={analytics.agentOnboardingStatus} horizontal />
           </ChartCard>
@@ -112,7 +112,7 @@ function MetricCard({
   accent: string;
 }) {
   return (
-    <Card className="rounded-[26px]">
+    <Card className="crm-dashboard-analytics-card rounded-[26px]">
       <CardContent className="flex items-center justify-between gap-3 p-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[#25425E]/75">{label}</p>
@@ -139,7 +139,7 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card>
+    <Card className="crm-dashboard-chart-card">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>

@@ -46,10 +46,58 @@ input {
 }
 
 .crm-shell-bg {
+  position: relative;
+  overflow-x: clip;
   background:
     radial-gradient(circle at 12% 12%, rgb(233 215 161 / 48%), transparent 28%),
     radial-gradient(circle at 88% 18%, rgb(14 94 201 / 15%), transparent 32%),
     linear-gradient(135deg, #fdfdfd 0%, #f4f6f7 46%, #e7ecef 100%);
+  background-position:
+    0% 0%,
+    100% 8%,
+    50% 50%;
+  background-size:
+    125% 125%,
+    118% 118%,
+    100% 100%;
+}
+
+.crm-animated-bg {
+  animation: crm-bg-drift 18s ease-in-out infinite alternate;
+}
+
+.crm-auth-shell::before,
+.crm-auth-shell::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+}
+
+.crm-auth-shell::before {
+  z-index: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 35%,
+    rgb(255 255 255 / 34%) 48%,
+    rgb(233 215 161 / 18%) 52%,
+    transparent 66%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  transform: translateX(-56%);
+  animation: crm-auth-sweep 7s ease-in-out infinite;
+}
+
+.crm-auth-shell::after {
+  z-index: 0;
+  background-image:
+    linear-gradient(rgb(14 94 201 / 8%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(14 94 201 / 7%) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 78%, transparent 100%);
+  opacity: 0.32;
 }
 
 .crm-card {
@@ -62,6 +110,7 @@ input {
     box-shadow 220ms ease,
     border-color 220ms ease,
     background-color 220ms ease;
+  will-change: transform;
 }
 
 .crm-panel {
@@ -80,11 +129,510 @@ input {
 }
 
 .crm-animate-page {
-  animation: crm-fade-up 360ms ease both;
+  animation: crm-fade-up 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .crm-animate-pop {
-  animation: crm-pop 260ms ease both;
+  animation: crm-pop 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--crm-delay, 0ms);
+}
+
+.crm-enter,
+.crm-login-item {
+  opacity: 0;
+  animation: crm-enter-up 640ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--crm-delay, 0ms);
+}
+
+.crm-motion-delay-1 {
+  --crm-delay: 90ms;
+}
+
+.crm-motion-delay-2 {
+  --crm-delay: 170ms;
+}
+
+.crm-motion-delay-3 {
+  --crm-delay: 250ms;
+}
+
+.crm-motion-delay-4 {
+  --crm-delay: 330ms;
+}
+
+.crm-motion-delay-5 {
+  --crm-delay: 410ms;
+}
+
+.crm-motion-delay-6 {
+  --crm-delay: 490ms;
+}
+
+.crm-motion-delay-7 {
+  --crm-delay: 570ms;
+}
+
+.crm-motion-delay-8 {
+  --crm-delay: 650ms;
+}
+
+.crm-stagger > * {
+  opacity: 0;
+  animation: crm-enter-up 540ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.crm-stagger > *:nth-child(1) {
+  animation-delay: 470ms;
+}
+
+.crm-stagger > *:nth-child(2) {
+  animation-delay: 560ms;
+}
+
+.crm-stagger > *:nth-child(3) {
+  animation-delay: 650ms;
+}
+
+.crm-stagger > *:nth-child(4) {
+  animation-delay: 740ms;
+}
+
+.crm-shell-header {
+  animation: crm-drop-in 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.crm-shell-brand,
+.crm-shell-actions,
+.crm-page-title {
+  animation: crm-enter-up 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.crm-shell-brand {
+  animation-delay: 80ms;
+}
+
+.crm-shell-actions {
+  animation-delay: 180ms;
+}
+
+.crm-page-title {
+  animation-delay: 140ms;
+}
+
+.crm-nav-item {
+  animation: crm-nav-in 460ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.crm-nav-item:nth-child(1) {
+  animation-delay: 120ms;
+}
+
+.crm-nav-item:nth-child(2) {
+  animation-delay: 155ms;
+}
+
+.crm-nav-item:nth-child(3) {
+  animation-delay: 190ms;
+}
+
+.crm-nav-item:nth-child(4) {
+  animation-delay: 225ms;
+}
+
+.crm-nav-item:nth-child(5) {
+  animation-delay: 260ms;
+}
+
+.crm-nav-item:nth-child(6) {
+  animation-delay: 295ms;
+}
+
+.crm-nav-item:nth-child(7) {
+  animation-delay: 330ms;
+}
+
+.crm-nav-item:nth-child(8) {
+  animation-delay: 365ms;
+}
+
+.crm-nav-item:nth-child(9) {
+  animation-delay: 400ms;
+}
+
+.crm-nav-item:nth-child(10) {
+  animation-delay: 435ms;
+}
+
+.crm-rail {
+  animation: crm-rail-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) 220ms both;
+}
+
+.crm-rail-link {
+  animation: crm-scale-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.crm-rail-link:nth-child(1) {
+  animation-delay: 360ms;
+}
+
+.crm-rail-link:nth-child(2) {
+  animation-delay: 390ms;
+}
+
+.crm-rail-link:nth-child(3) {
+  animation-delay: 420ms;
+}
+
+.crm-rail-link:nth-child(4) {
+  animation-delay: 450ms;
+}
+
+.crm-rail-link:nth-child(5) {
+  animation-delay: 480ms;
+}
+
+.crm-rail-link:nth-child(6) {
+  animation-delay: 510ms;
+}
+
+.crm-rail-link:nth-child(7) {
+  animation-delay: 540ms;
+}
+
+.crm-rail-link:nth-child(8) {
+  animation-delay: 570ms;
+}
+
+.crm-rail-link:nth-child(n + 9) {
+  animation-delay: 600ms;
+}
+
+.crm-login-panel {
+  animation: crm-panel-fly-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.crm-login-card {
+  animation: crm-card-fly-in 760ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both;
+}
+
+.crm-auth-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.crm-auth-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #25425e;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.crm-auth-step-dot {
+  position: relative;
+  display: inline-flex;
+  width: 1.8rem;
+  height: 1.8rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #0e5ec9;
+  color: #fff;
+  box-shadow: 0 10px 22px rgb(14 94 201 / 20%);
+}
+
+.crm-auth-step-dot::after {
+  position: absolute;
+  inset: -0.35rem;
+  border: 1px solid rgb(14 94 201 / 22%);
+  border-radius: inherit;
+  content: "";
+  animation: crm-pulse-ring 1.8s ease-out infinite;
+}
+
+.crm-auth-step-line {
+  position: relative;
+  display: inline-flex;
+  width: clamp(1.4rem, 3vw, 3rem);
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(37 66 94 / 16%);
+}
+
+.crm-auth-step-line::after {
+  display: block;
+  width: 55%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, #0e5ec9, transparent);
+  content: "";
+  animation: crm-line-run 1.6s ease-in-out infinite;
+}
+
+.crm-login-console {
+  position: relative;
+}
+
+.crm-login-console::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgb(233 215 161 / 10%), transparent);
+  content: "";
+  transform: translateY(-100%);
+  animation: crm-console-scan 4.8s ease-in-out infinite;
+}
+
+.crm-live-dot {
+  position: relative;
+  display: inline-flex;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: #20d39b;
+  box-shadow: 0 0 0 0 rgb(32 211 155 / 42%);
+  animation: crm-live-pulse 1.45s ease-out infinite;
+}
+
+.crm-login-activity {
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 6%);
+  padding: 1rem;
+  opacity: 0;
+  animation: crm-enter-up 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--crm-delay, 0ms);
+}
+
+.crm-login-progress {
+  transform-origin: left center;
+  animation: crm-progress-grow 980ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--crm-delay, 0ms) + 140ms);
+}
+
+.crm-login-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.crm-login-primary::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgb(255 255 255 / 22%) 45%, transparent 70%);
+  content: "";
+  transform: translateX(-110%);
+  animation: crm-button-shimmer 2.8s ease-in-out infinite;
+}
+
+.crm-login-primary > * {
+  position: relative;
+  z-index: 1;
+}
+
+.crm-dashboard-page {
+  perspective: 1200px;
+}
+
+.crm-dashboard-motion,
+.crm-dashboard-analytics {
+  --crm-dashboard-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.crm-dashboard-stat,
+.crm-dashboard-flash,
+.crm-dashboard-workbench-card,
+.crm-dashboard-alert,
+.crm-dashboard-panel,
+.crm-dashboard-opportunity,
+.crm-dashboard-calendar-day,
+.crm-dashboard-task-row,
+.crm-dashboard-funnel-row,
+.crm-dashboard-customer,
+.crm-dashboard-detail-row,
+.crm-dashboard-analytics,
+.crm-dashboard-analytics-card,
+.crm-dashboard-chart-card {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0) scale(0.985);
+  animation: crm-dashboard-rise 620ms var(--crm-dashboard-ease, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+  animation-delay: var(--crm-dashboard-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.crm-dashboard-flash {
+  animation-name: crm-dashboard-pop-message;
+  --crm-dashboard-delay: 80ms;
+}
+
+.crm-dashboard-kpis > *:nth-child(1) {
+  --crm-dashboard-delay: 80ms;
+}
+
+.crm-dashboard-kpis > *:nth-child(2) {
+  --crm-dashboard-delay: 160ms;
+}
+
+.crm-dashboard-kpis > *:nth-child(3) {
+  --crm-dashboard-delay: 240ms;
+}
+
+.crm-dashboard-workbench > *:nth-child(1) {
+  --crm-dashboard-delay: 260ms;
+}
+
+.crm-dashboard-workbench > *:nth-child(2) {
+  --crm-dashboard-delay: 330ms;
+}
+
+.crm-dashboard-workbench > *:nth-child(3) {
+  --crm-dashboard-delay: 400ms;
+}
+
+.crm-dashboard-workbench > *:nth-child(4) {
+  --crm-dashboard-delay: 470ms;
+}
+
+.crm-dashboard-workbench > *:nth-child(5) {
+  --crm-dashboard-delay: 540ms;
+}
+
+.crm-dashboard-alerts > *:nth-child(1) {
+  --crm-dashboard-delay: 420ms;
+}
+
+.crm-dashboard-alerts > *:nth-child(2) {
+  --crm-dashboard-delay: 500ms;
+}
+
+.crm-dashboard-alerts > *:nth-child(3) {
+  --crm-dashboard-delay: 580ms;
+}
+
+.crm-dashboard-alerts > *:nth-child(4) {
+  --crm-dashboard-delay: 660ms;
+}
+
+.crm-dashboard-panel {
+  --crm-dashboard-delay: 560ms;
+}
+
+.crm-dashboard-opportunity:nth-child(1) {
+  --crm-dashboard-delay: 660ms;
+}
+
+.crm-dashboard-opportunity:nth-child(2) {
+  --crm-dashboard-delay: 730ms;
+}
+
+.crm-dashboard-opportunity:nth-child(3) {
+  --crm-dashboard-delay: 800ms;
+}
+
+.crm-dashboard-opportunity:nth-child(n + 4) {
+  --crm-dashboard-delay: 870ms;
+}
+
+.crm-dashboard-calendar-day:nth-child(7n + 1) {
+  --crm-dashboard-delay: 700ms;
+}
+
+.crm-dashboard-calendar-day:nth-child(7n + 2) {
+  --crm-dashboard-delay: 730ms;
+}
+
+.crm-dashboard-calendar-day:nth-child(7n + 3) {
+  --crm-dashboard-delay: 760ms;
+}
+
+.crm-dashboard-calendar-day:nth-child(7n + 4) {
+  --crm-dashboard-delay: 790ms;
+}
+
+.crm-dashboard-calendar-day:nth-child(7n + 5) {
+  --crm-dashboard-delay: 820ms;
+}
+
+.crm-dashboard-calendar-day:nth-child(7n + 6) {
+  --crm-dashboard-delay: 850ms;
+}
+
+.crm-dashboard-calendar-day:nth-child(7n) {
+  --crm-dashboard-delay: 880ms;
+}
+
+.crm-dashboard-funnel-row:nth-child(1),
+.crm-dashboard-task-row:nth-child(1) {
+  --crm-dashboard-delay: 760ms;
+}
+
+.crm-dashboard-funnel-row:nth-child(2),
+.crm-dashboard-task-row:nth-child(2) {
+  --crm-dashboard-delay: 830ms;
+}
+
+.crm-dashboard-funnel-row:nth-child(3),
+.crm-dashboard-task-row:nth-child(3) {
+  --crm-dashboard-delay: 900ms;
+}
+
+.crm-dashboard-funnel-row:nth-child(n + 4),
+.crm-dashboard-task-row:nth-child(n + 4) {
+  --crm-dashboard-delay: 970ms;
+}
+
+.crm-dashboard-aside > *:nth-child(1),
+.crm-dashboard-customer {
+  --crm-dashboard-delay: 500ms;
+}
+
+.crm-dashboard-aside > *:nth-child(2) {
+  --crm-dashboard-delay: 620ms;
+}
+
+.crm-dashboard-detail-row:nth-child(1) {
+  --crm-dashboard-delay: 720ms;
+}
+
+.crm-dashboard-detail-row:nth-child(2) {
+  --crm-dashboard-delay: 780ms;
+}
+
+.crm-dashboard-detail-row:nth-child(3) {
+  --crm-dashboard-delay: 840ms;
+}
+
+.crm-dashboard-detail-row:nth-child(4) {
+  --crm-dashboard-delay: 900ms;
+}
+
+.crm-dashboard-detail-row:nth-child(5) {
+  --crm-dashboard-delay: 960ms;
+}
+
+.crm-dashboard-analytics {
+  --crm-dashboard-delay: 780ms;
+}
+
+.crm-dashboard-analytics-grid > *:nth-child(1),
+.crm-dashboard-chart-grid > *:nth-child(1) {
+  --crm-dashboard-delay: 840ms;
+}
+
+.crm-dashboard-analytics-grid > *:nth-child(2),
+.crm-dashboard-chart-grid > *:nth-child(2) {
+  --crm-dashboard-delay: 900ms;
+}
+
+.crm-dashboard-analytics-grid > *:nth-child(3) {
+  --crm-dashboard-delay: 960ms;
+}
+
+.crm-dashboard-analytics-grid > *:nth-child(4) {
+  --crm-dashboard-delay: 1020ms;
 }
 
 .crm-card:hover {
@@ -107,6 +655,214 @@ input {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes crm-bg-drift {
+  from {
+    background-position:
+      0% 0%,
+      100% 8%,
+      50% 50%;
+  }
+
+  to {
+    background-position:
+      16% 12%,
+      82% 22%,
+      50% 50%;
+  }
+}
+
+@keyframes crm-auth-sweep {
+  0%,
+  32% {
+    transform: translateX(-58%);
+  }
+
+  72%,
+  100% {
+    transform: translateX(58%);
+  }
+}
+
+@keyframes crm-enter-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes crm-drop-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -18px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes crm-nav-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes crm-rail-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-18px, 0, 0) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes crm-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes crm-panel-fly-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-28px, 20px, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes crm-card-fly-in {
+  from {
+    opacity: 0;
+    transform: translate3d(28px, 20px, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes crm-pulse-ring {
+  from {
+    opacity: 0.65;
+    transform: scale(0.78);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.24);
+  }
+}
+
+@keyframes crm-line-run {
+  from {
+    transform: translateX(-120%);
+  }
+
+  to {
+    transform: translateX(210%);
+  }
+}
+
+@keyframes crm-console-scan {
+  0%,
+  38% {
+    transform: translateY(-100%);
+  }
+
+  78%,
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes crm-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(32 211 155 / 44%);
+  }
+
+  72%,
+  100% {
+    box-shadow: 0 0 0 0.75rem rgb(32 211 155 / 0%);
+  }
+}
+
+@keyframes crm-progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes crm-button-shimmer {
+  0%,
+  44% {
+    transform: translateX(-112%);
+  }
+
+  76%,
+  100% {
+    transform: translateX(112%);
+  }
+}
+
+@keyframes crm-dashboard-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) rotateX(2deg) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotateX(0) scale(1);
+  }
+}
+
+@keyframes crm-dashboard-pop-message {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.98);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translate3d(0, 1px, 0) scale(1.005);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
@@ -134,6 +890,62 @@ input {
 
   .crm-card:hover {
     transform: none;
+  }
+
+  .crm-auth-shell::before,
+  .crm-auth-step-dot::after,
+  .crm-login-console::after,
+  .crm-login-primary::after {
+    display: none;
+  }
+
+  .crm-enter,
+  .crm-login-item,
+  .crm-stagger > *,
+  .crm-shell-header,
+  .crm-shell-brand,
+  .crm-shell-actions,
+  .crm-page-title,
+  .crm-nav-item,
+  .crm-rail,
+  .crm-rail-link,
+  .crm-login-panel,
+  .crm-login-card,
+  .crm-login-activity,
+  .crm-dashboard-stat,
+  .crm-dashboard-flash,
+  .crm-dashboard-workbench-card,
+  .crm-dashboard-alert,
+  .crm-dashboard-panel,
+  .crm-dashboard-opportunity,
+  .crm-dashboard-calendar-day,
+  .crm-dashboard-task-row,
+  .crm-dashboard-funnel-row,
+  .crm-dashboard-customer,
+  .crm-dashboard-detail-row,
+  .crm-dashboard-analytics,
+  .crm-dashboard-analytics-card,
+  .crm-dashboard-chart-card {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-height: 780px) and (min-width: 1024px) {
+  .crm-login-panel {
+    padding: 1.25rem;
+  }
+
+  .crm-login-panel .mt-7 {
+    margin-top: 1.1rem;
+  }
+
+  .crm-login-activity {
+    padding: 0.75rem 1rem;
+  }
+
+  .crm-login-signals {
+    display: none;
   }
 }
 

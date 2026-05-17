@@ -102,12 +102,12 @@ export function AppShell({
   const canViewMerchants = profile ? hasPermission(profile.role, rolePermissions, "merchants.view") : true;
 
   return (
-    <div className="crm-shell-bg min-h-screen text-[#0B0F15]">
+    <div className="crm-shell-bg crm-animated-bg min-h-screen text-[#0B0F15]">
       <div className="min-h-screen w-full overflow-hidden">
-        <header className="sticky top-0 z-30 border-b border-white/65 bg-[#FDFDFD]/72 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
+        <header className="crm-shell-header sticky top-0 z-30 border-b border-white/65 bg-[#FDFDFD]/72 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-4">
-              <Link href="/dashboard" className="group flex min-w-[8.5rem] items-center" aria-label={`${brand.productName} dashboard`}>
+              <Link href="/dashboard" className="crm-shell-brand group flex min-w-[8.5rem] items-center" aria-label={`${brand.productName} dashboard`}>
                 <BrandLogo className="h-16 w-auto object-contain" priority />
               </Link>
 
@@ -118,7 +118,7 @@ export function AppShell({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`rounded-full px-5 py-3 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
+                      className={`crm-nav-item rounded-full px-5 py-3 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
                       active
                         ? "bg-black text-white shadow-[0_14px_30px_rgba(0,0,0,0.18)]"
                           : "text-[#25425E] hover:bg-white/70 hover:text-[#0B0F15]"
@@ -131,7 +131,7 @@ export function AppShell({
               </nav>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="crm-shell-actions flex flex-col gap-3 sm:flex-row sm:items-center">
               <HeaderActions
                 canUseCopilot={canUseCopilot}
                 canCreateMerchants={canCreateMerchants}
@@ -169,7 +169,7 @@ export function AppShell({
           </div>
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between xl:hidden">
-            <div>
+            <div className="crm-page-title">
               <p className="text-xs font-semibold uppercase text-[#25425E]/70">{eyebrow}</p>
               <h1 className="text-2xl font-black text-[#0B0F15]">{title}</h1>
             </div>
@@ -181,7 +181,7 @@ export function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
+                    className={`crm-nav-item inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${
                       active ? "bg-black text-white" : "bg-white/65 text-[#25425E]"
                     }`}
                   >
@@ -195,7 +195,7 @@ export function AppShell({
         </header>
 
         <div className="relative">
-          <aside className="fixed left-5 top-[8.5rem] z-20 hidden max-h-[calc(100vh-10rem)] overflow-visible rounded-full bg-[#0B0F15]/95 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:items-start xl:gap-2">
+          <aside className="crm-rail fixed left-5 top-[8.5rem] z-20 hidden max-h-[calc(100vh-10rem)] overflow-visible rounded-full bg-[#0B0F15]/95 p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)] backdrop-blur xl:flex xl:flex-col xl:items-start xl:gap-2">
             {visibleRailItems.map((item) => {
               const Icon = item.icon;
               const active = activeHref === item.href || activeHref.startsWith(`${item.href}/`);
@@ -205,7 +205,7 @@ export function AppShell({
                   href={item.href}
                   aria-label={item.label}
                   title={item.label}
-                  className={`group/rail-link relative flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D7A1]/75 ${
+                  className={`crm-rail-link group/rail-link relative flex h-11 w-11 items-center justify-center rounded-full transition-all duration-200 ease-out hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D7A1]/75 ${
                     active
                       ? "bg-[#E9D7A1] text-[#0B0F15]"
                       : "text-white/90 hover:bg-white hover:text-[#0B0F15] focus-visible:bg-white focus-visible:text-[#0B0F15]"
@@ -225,7 +225,7 @@ export function AppShell({
           </aside>
 
           <main className="crm-animate-page min-h-[calc(100vh-8rem)] px-4 py-6 sm:px-6 lg:px-8 xl:pl-28">
-            <div className="hidden pb-6 xl:block">
+            <div className="crm-page-title hidden pb-6 xl:block">
               <p className="text-xs font-semibold uppercase text-[#25425E]/70">{eyebrow}</p>
               <h1 className="mt-1 text-4xl font-black text-[#0B0F15]">{title}</h1>
             </div>

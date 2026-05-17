@@ -253,9 +253,9 @@ export function DashboardOverview({ data }: { data: CrmData }) {
   }
 
   return (
-    <section id="dashboard" className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+    <section id="dashboard" className="crm-dashboard-motion grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="crm-dashboard-kpis grid gap-4 md:grid-cols-3">
           <StatPill
             icon={<Share2 className="h-5 w-5" />}
             value={currency(totalWonResidual || processingVolume)}
@@ -280,7 +280,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
         </div>
 
         {actionMessage ? (
-          <div className="rounded-[22px] border border-black/10 bg-white/45 px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_35px_rgba(15,23,42,0.06)] backdrop-blur">
+          <div className="crm-dashboard-flash rounded-[22px] border border-black/10 bg-white/45 px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_35px_rgba(15,23,42,0.06)] backdrop-blur">
             {actionMessage}
           </div>
         ) : null}
@@ -406,7 +406,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
                     type="button"
                     aria-label={`${scheduleMonth} ${day}: ${dayTasks.length} task${dayTasks.length === 1 ? "" : "s"}`}
                     onClick={() => selectScheduleDay(day, dayTasks)}
-                    className={`min-h-20 rounded-2xl p-2 text-left text-xs transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-black/20 ${color}`}
+                    className={`crm-dashboard-calendar-day min-h-20 rounded-2xl p-2 text-left text-xs transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-black/20 ${color}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{day}</span>
@@ -451,7 +451,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
                     <Link
                       key={task.id}
                       href={task.merchant_id ? `/tasks?merchant=${task.merchant_id}` : "/tasks"}
-                      className="block rounded-2xl border border-[#ABB7C0]/20 bg-white/55 p-3 text-sm transition hover:bg-white"
+                      className="crm-dashboard-task-row block rounded-2xl border border-[#ABB7C0]/20 bg-white/55 p-3 text-sm transition hover:bg-white"
                       onClick={() => {
                         if (merchant) setSelectedMerchantId(merchant.id);
                       }}
@@ -545,7 +545,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
                         setActionMessage(`${stage.label} has no assigned merchant yet.`);
                       }
                     }}
-                    className="w-full rounded-3xl bg-white/35 p-4 text-left transition hover:bg-white/55 focus:outline-none focus:ring-2 focus:ring-black/20"
+                    className="crm-dashboard-funnel-row w-full rounded-3xl bg-white/35 p-4 text-left transition hover:bg-white/55 focus:outline-none focus:ring-2 focus:ring-black/20"
                   >
                     <div className="mb-2 flex items-center justify-between gap-4 text-sm">
                       <span className="font-medium text-slate-600">{stage.label}</span>
@@ -566,7 +566,7 @@ export function DashboardOverview({ data }: { data: CrmData }) {
         </div>
       </div>
 
-      <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start">
+      <aside className="crm-dashboard-aside space-y-6 xl:sticky xl:top-28 xl:self-start">
         <CustomerCard
           merchant={selectedMerchant}
           deal={selectedDeal}
@@ -590,7 +590,7 @@ function RiskAlertStrip({
 }) {
   if (!alerts.length) {
     return (
-      <div className="crm-panel rounded-[28px] p-4">
+      <div className="crm-dashboard-panel crm-panel rounded-[28px] p-4">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0E5EC9]/10 text-[#0E5EC9]">
             <ShieldCheck className="h-4 w-4" />
@@ -605,7 +605,7 @@ function RiskAlertStrip({
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="crm-dashboard-alerts grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {alerts.map((alert) => {
         const content = (
           <>
@@ -622,7 +622,7 @@ function RiskAlertStrip({
             <Link
               key={`${alert.title}-${alert.merchantId}`}
               href={alert.href}
-              className="crm-card rounded-[26px] p-4 transition hover:-translate-y-0.5"
+              className="crm-dashboard-alert crm-card rounded-[26px] p-4 transition hover:-translate-y-0.5"
               onClick={() => onSelectMerchant(alert.merchantId!, alert.title)}
             >
               {content}
@@ -631,7 +631,7 @@ function RiskAlertStrip({
         }
 
         return (
-          <Link key={alert.title} href={alert.href} className="crm-card rounded-[26px] p-4 transition hover:-translate-y-0.5">
+          <Link key={alert.title} href={alert.href} className="crm-dashboard-alert crm-card rounded-[26px] p-4 transition hover:-translate-y-0.5">
             {content}
           </Link>
         );
@@ -642,7 +642,7 @@ function RiskAlertStrip({
 
 function Panel({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
   return (
-    <div className="crm-card rounded-[34px] p-5">
+    <div className="crm-dashboard-panel crm-card rounded-[34px] p-5">
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="text-lg font-bold text-[#0B0F15]">{title}</h2>
         {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
@@ -707,12 +707,12 @@ function ProcessingWorkbench({
   ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-5">
+    <div className="crm-dashboard-workbench grid gap-3 md:grid-cols-5">
       {actions.map((action) => (
         <Link
           key={action.label}
           href={action.href}
-          className="crm-card group rounded-[28px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_24px_58px_rgba(11,15,21,0.12)] focus:outline-none focus:ring-2 focus:ring-[#0E5EC9]/25"
+          className="crm-dashboard-workbench-card crm-card group rounded-[28px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_24px_58px_rgba(11,15,21,0.12)] focus:outline-none focus:ring-2 focus:ring-[#0E5EC9]/25"
         >
           <div className={`mb-5 flex h-10 w-10 items-center justify-center rounded-full ${action.tone}`}>{action.icon}</div>
           <p className="text-2xl font-black text-[#0B0F15]">{action.value}</p>
@@ -743,7 +743,7 @@ function OpportunityTile({
 
   return (
     <div
-      className={`min-h-44 rounded-[24px] p-5 text-left transition hover:-translate-y-1 hover:shadow-2xl ${palette.card} ${
+      className={`crm-dashboard-opportunity min-h-44 rounded-[24px] p-5 text-left transition hover:-translate-y-1 hover:shadow-2xl ${palette.card} ${
         selected ? "ring-2 ring-black/20" : ""
       }`}
     >
@@ -796,7 +796,7 @@ function CustomerCard({
   const taskHref = `/tasks?merchant=${encodeURIComponent(merchant.id)}`;
 
   return (
-    <div className="crm-card rounded-[34px] p-6 text-center">
+    <div className="crm-dashboard-customer crm-card rounded-[34px] p-6 text-center">
       <div className="mb-5 flex items-center justify-between">
         <div className="flex gap-2">
           <IconButton label="Share contact" onClick={onShare}>
@@ -882,7 +882,7 @@ function DetailCard({ merchant, agentName }: { merchant?: Merchant; agentName: s
     >
       <div className="space-y-4">
         {details.map((item) => (
-          <div key={item.label} className="grid grid-cols-[1.5rem_1fr_auto] items-center gap-3">
+          <div key={item.label} className="crm-dashboard-detail-row grid grid-cols-[1.5rem_1fr_auto] items-center gap-3">
             <div className="text-slate-500">{item.icon}</div>
             <div className="min-w-0">
               <p className="text-xs text-slate-500">{item.label}</p>
@@ -912,7 +912,7 @@ function StatPill({
   accentClassName: string;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-[28px] bg-white/28 p-4 backdrop-blur">
+    <div className="crm-dashboard-stat flex items-center gap-4 rounded-[28px] bg-white/28 p-4 backdrop-blur">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/5 text-slate-950">{icon}</div>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
