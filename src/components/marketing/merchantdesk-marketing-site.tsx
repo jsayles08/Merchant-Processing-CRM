@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ClipboardCheck,
   FileSignature,
-  LineChart,
   LockKeyhole,
   Menu,
   MessageSquareText,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { requestAccess, type RequestAccessResult } from "@/app/actions/request-access";
+import { BrandLogo } from "@/components/brand-logo";
 import { brand } from "@/lib/branding";
 
 const navItems = [
@@ -342,9 +342,8 @@ export function MerchantDeskMarketingSite() {
         ].join(" ")}
       >
         <div className="mx-auto flex w-full max-w-[1240px] items-center justify-between gap-6 px-5 py-4 sm:px-8 lg:px-0">
-          <Link href="/" aria-label={`${brand.productName} home`} className="inline-flex items-center gap-3 font-black">
-            <MerchantMark />
-            <span className="text-lg tracking-[-0.02em]">{brand.productName}</span>
+          <Link href="/" aria-label={`${brand.productName} home`} className="inline-flex shrink-0 items-center">
+            <BrandLogo className="h-14 w-auto rounded-xl object-contain shadow-sm sm:h-16" priority />
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm font-bold text-[#2f3e4d] lg:flex" aria-label="Primary">
@@ -1373,9 +1372,12 @@ function Footer() {
     <footer className="relative z-10 bg-[#101318] px-5 py-16 text-white/70 sm:px-8 lg:px-10">
       <div className="mx-auto grid max-w-[1240px] gap-10 border-b border-white/10 pb-12 md:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div>
-          <Link href="/" className="inline-flex items-center gap-3 font-black text-white">
-            <MerchantMark />
-            <span className="text-lg">{brand.productName}</span>
+          <Link
+            href="/"
+            aria-label={`${brand.productName} home`}
+            className="inline-flex rounded-2xl bg-white px-4 py-2 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e9d7a1]"
+          >
+            <BrandLogo className="h-14 w-auto rounded-xl object-contain sm:h-16" />
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-6 text-white/50">The merchant services command center.</p>
         </div>
@@ -1473,13 +1475,5 @@ function CheckItem({ children, dark = false }: { children: ReactNode; dark?: boo
       </span>
       <span>{children}</span>
     </li>
-  );
-}
-
-function MerchantMark() {
-  return (
-    <span className="flex h-9 w-9 items-center justify-center rounded-[0.7rem] bg-[#101318] text-[#e9d7a1] shadow-sm" aria-hidden="true">
-      <LineChart className="h-5 w-5" />
-    </span>
   );
 }
