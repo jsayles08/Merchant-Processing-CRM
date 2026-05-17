@@ -8,11 +8,12 @@ export const metadata: Metadata = {
   ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
   title: `${brand.productName} | CRM for Merchant Services Growth`,
   description:
-    "MerchantDesk is a branded CRM for merchant services teams managing sales pipelines, onboarding, underwriting, residuals, payroll, documents, and AI-assisted work.",
+    "MerchantDesk brings sales, underwriting, onboarding, documents, residuals, and AI-assisted work into one controlled workspace for merchant processing teams.",
   openGraph: {
     title: `${brand.productName} | CRM for Merchant Services Growth`,
     description:
       "A polished CRM for ISOs, agents, managers, and operations teams that need pipeline control, merchant onboarding, residual tracking, and Copilot-powered execution.",
+    ...(siteUrl ? { url: siteUrl } : {}),
     ...(siteUrl ? { images: ["/merchantdesk-logo.png"] } : {}),
   },
 };
