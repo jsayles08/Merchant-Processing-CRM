@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Store,
   Upload,
+  UserCog,
   UserPlus,
   UsersRound,
 } from "lucide-react";
@@ -41,6 +42,7 @@ const topNavItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Recruitment", icon: UserPlus, href: "/recruitment" },
   { label: "Teams", icon: UsersRound, href: "/teams" },
+  { label: "Agents", icon: UserCog, href: "/agents" },
   { label: "Agent Onboarding", icon: GraduationCap, href: "/agent-onboarding" },
   { label: "Merchant Onboarding", icon: Store, href: "/merchant-onboarding" },
   { label: "Merchants", icon: BriefcaseBusiness, href: "/merchants" },
@@ -53,6 +55,7 @@ const railItems: NavItem[] = [
   { label: "Search merchants", icon: Search, href: "/merchants" },
   { label: "Recruitment", icon: UserPlus, href: "/recruitment" },
   { label: "Teams", icon: UsersRound, href: "/teams" },
+  { label: "Agents", icon: UserCog, href: "/agents" },
   { label: "Agent Onboarding", icon: GraduationCap, href: "/agent-onboarding" },
   { label: "Merchant Onboarding", icon: Store, href: "/merchant-onboarding" },
   { label: "Opportunities", icon: Share2, href: "/opportunities" },

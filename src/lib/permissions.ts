@@ -5,6 +5,8 @@ export type PermissionKey =
   | "merchants.view"
   | "merchants.create"
   | "merchants.delete"
+  | "agents.view"
+  | "agents.manage"
   | "opportunities.view"
   | "tasks.view"
   | "tasks.manage"
@@ -57,6 +59,8 @@ export const permissionCatalog: PermissionCatalogItem[] = [
   { key: "merchants.view", label: "Merchant book", description: "View assigned merchant records and profiles.", category: "Core CRM", navHref: "/merchants", critical: true },
   { key: "merchants.create", label: "Create merchants", description: "Add new merchants and opportunities.", category: "Core CRM" },
   { key: "merchants.delete", label: "Delete merchants", description: "Remove merchant records and related files.", category: "Core CRM" },
+  { key: "agents.view", label: "Agents", description: "View the agent directory, profile details, assignments, and activity context.", category: "Core CRM", navHref: "/agents" },
+  { key: "agents.manage", label: "Manage agents", description: "Add, edit, deactivate, and safely delete agent profiles.", category: "Core CRM" },
   { key: "opportunities.view", label: "Opportunities", description: "Open sales pipeline and approval queues.", category: "Core CRM", navHref: "/opportunities" },
   { key: "tasks.view", label: "Tasks", description: "View task and follow-up center.", category: "Core CRM", navHref: "/tasks" },
   { key: "tasks.manage", label: "Manage tasks", description: "Create, assign, and complete workflow tasks.", category: "Core CRM" },
@@ -103,6 +107,8 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "merchants.view": true,
     "merchants.create": true,
     "merchants.delete": false,
+    "agents.view": false,
+    "agents.manage": false,
     "opportunities.view": true,
     "tasks.view": true,
     "tasks.manage": true,
@@ -145,6 +151,8 @@ export const defaultRolePermissionMatrix: Record<Role, Record<PermissionKey, boo
     "merchants.view": true,
     "merchants.create": true,
     "merchants.delete": true,
+    "agents.view": true,
+    "agents.manage": false,
     "opportunities.view": true,
     "tasks.view": true,
     "tasks.manage": true,

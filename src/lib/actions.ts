@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { writeAgentActivity } from "@/lib/activity";
+import { buildSuggestedAgentCode } from "@/lib/agent-management";
 import { writeAuditLog } from "@/lib/audit";
 import { getSessionContext } from "@/lib/auth";
 import { brand } from "@/lib/branding";
@@ -16,7 +17,7 @@ import {
   syncPayrollIntegration,
   testPayrollIntegration,
 } from "@/lib/payroll";
-import { enterpriseSettingDefaults, permissionCatalog } from "@/lib/permissions";
+import { enterpriseSettingDefaults, hasPermission, permissionCatalog, type PermissionKey } from "@/lib/permissions";
 import {
   buildProcessorPricingAuditMetadata,
   calculateResidualBreakdown,
@@ -38,6 +39,7 @@ import {
   updateOpportunityStage,
 } from "@/lib/workflow-automation";
 import type {
+  Agent,
   AgentOnboardingRecord,
   AgentOnboardingStep,
   AgentRecruit,
@@ -52,6 +54,7 @@ import type {
   PayrollProviderId,
   ProcessorPricingSetting,
   ProcessorPricingUnit,
+  Profile,
   RecruitStatus,
   Role,
   RolePermission,
@@ -209,6 +212,38 @@ const CreateTeamMemberInput = z.object({
   agent_code: z.string().trim().optional(),
   sponsor_agent_id: z.preprocess((value) => (value === "" ? undefined : value), z.string().uuid().optional()),
   temp_password: z.string().min(8),
+});
+
+const ProfileStatusInput = z.enum(["active", "invited", "inactive"]);
+const AgentStatusInput = z.enum(["active", "ramping", "inactive"]);
+
+const CreateAgentProfileInput = z.object({
+  full_name: z.string().trim().min(1),
+  email: z.string().trim().email().transform((email) => email.toLowerCase()),
+  phone: z.string().trim().optional(),
+  status: ProfileStatusInput.default("active"),
+  manager_id: z.preprocess((value) => (value === "" ? undefined : value), z.string().uuid().optional()),
+  agent_code: z.string().trim().optional(),
+  sponsor_agent_id: z.preprocess((value) => (value === "" ? undefined : value), z.string().uuid().optional()),
+  temp_password: z.string().min(8),
+});
+
+const UpdateAgentProfileInput = z.object({
+  profile_id: z.string().uuid(),
+  full_name: z.string().trim().min(1),
+  email: z.string().trim().email().transform((email) => email.toLowerCase()),
+  phone: z.string().trim().optional(),
+  status: ProfileStatusInput,
+  manager_id: z.preprocess((value) => (value === "" ? null : value), z.string().uuid().nullable().optional()),
+  agent_id: z.string().uuid(),
+  agent_code: z.string().trim().min(2).max(48),
+  sponsor_agent_id: z.preprocess((value) => (value === "" ? null : value), z.string().uuid().nullable().optional()),
+  agent_status: AgentStatusInput,
+  start_date: z.string().trim().min(1),
+});
+
+const DeleteAgentProfileInput = z.object({
+  profile_id: z.string().uuid(),
 });
 
 const TaskInput = z.object({
@@ -1288,6 +1323,19 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
   }
 
   let userId = listed.data.users.find((user) => user.email?.toLowerCase() === parsed.data.email)?.id;
+  const { data: existingProfileByEmail, error: existingEmailError } = await adminSupabase
+    .from("profiles")
+    .select("id,role,user_id")
+    .eq("email", parsed.data.email)
+    .maybeSingle<{ id: string; role: Role; user_id: string | null }>();
+
+  if (existingEmailError) return { ok: false, message: existingEmailError.message };
+  if (existingProfileByEmail?.role && existingProfileByEmail.role !== "agent") {
+    return { ok: false, message: "That email already belongs to a non-agent user. Edit it from Settings instead." };
+  }
+  if (!userId && existingProfileByEmail?.user_id) {
+    userId = existingProfileByEmail.user_id;
+  }
 
   if (!userId) {
     const created = await adminSupabase.auth.admin.createUser({
@@ -1400,6 +1448,370 @@ export async function createTeamMemberAction(input: unknown): Promise<ActionResu
   revalidatePath("/dashboard");
   revalidatePath("/settings");
   return { ok: true, message: `${parsed.data.full_name} is ready to use ${brand.companyName}.` };
+}
+
+export async function createAgentProfileAction(input: unknown): Promise<ActionResult> {
+  const parsed = CreateAgentProfileInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Complete the required agent fields." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (!(await currentProfileHasPermission(supabase, profile, "agents.manage"))) {
+    return { ok: false, message: "You do not have permission to manage agents." };
+  }
+
+  let adminSupabase: SupabaseClient;
+  try {
+    adminSupabase = createAdminClient();
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Supabase admin client is not configured." };
+  }
+
+  const managerCheck = await validateManagerAssignment(adminSupabase, parsed.data.manager_id || null);
+  if (!managerCheck.ok) return managerCheck;
+
+  const listed = await adminSupabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (listed.error) {
+    return { ok: false, message: listed.error.message };
+  }
+
+  let userId = listed.data.users.find((user) => user.email?.toLowerCase() === parsed.data.email)?.id;
+
+  if (!userId) {
+    const created = await adminSupabase.auth.admin.createUser({
+      email: parsed.data.email,
+      password: parsed.data.temp_password,
+      email_confirm: true,
+      user_metadata: { full_name: parsed.data.full_name },
+    });
+
+    if (created.error || !created.data.user) {
+      return { ok: false, message: created.error?.message ?? "Unable to create Auth user." };
+    }
+
+    userId = created.data.user.id;
+  } else {
+    const updated = await adminSupabase.auth.admin.updateUserById(userId, {
+      password: parsed.data.temp_password,
+      user_metadata: { full_name: parsed.data.full_name },
+    });
+
+    if (updated.error) return { ok: false, message: updated.error.message };
+  }
+
+  const existingProfile = await findExistingProfile(adminSupabase, userId, parsed.data.email);
+  if (existingProfile) {
+    const { data: existingProfileRow, error: existingProfileError } = await adminSupabase
+      .from("profiles")
+      .select("id,role")
+      .eq("id", existingProfile.id)
+      .maybeSingle<{ id: string; role: Role }>();
+
+    if (existingProfileError) return { ok: false, message: existingProfileError.message };
+    if (existingProfileRow && existingProfileRow.role !== "agent") {
+      return { ok: false, message: "That email already belongs to a non-agent user. Edit it from Settings instead." };
+    }
+  }
+  const profilePayload = {
+    user_id: userId,
+    full_name: parsed.data.full_name,
+    email: parsed.data.email,
+    role: "agent" as Role,
+    phone: parsed.data.phone || null,
+    status: parsed.data.status,
+    manager_id: parsed.data.manager_id || null,
+  };
+  const profileWrite = existingProfile
+    ? adminSupabase.from("profiles").update(profilePayload).eq("id", existingProfile.id)
+    : adminSupabase.from("profiles").insert(profilePayload);
+  const { data: profileRow, error: profileError } = await profileWrite.select("*").single<Profile>();
+
+  if (profileError || !profileRow) {
+    return { ok: false, message: profileError?.message ?? "Unable to save agent profile." };
+  }
+
+  let teamAssignment: Awaited<ReturnType<typeof resolveTeamAssignment>>;
+  try {
+    teamAssignment = await resolveTeamAssignment(adminSupabase, parsed.data.sponsor_agent_id || null);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Unable to resolve team assignment." };
+  }
+
+  const { data: existingAgents } = await adminSupabase.from("agents").select("agent_code").returns<{ agent_code: string }[]>();
+  const agentCode =
+    parsed.data.agent_code?.trim() ||
+    buildSuggestedAgentCode(parsed.data.full_name, (existingAgents ?? []).map((agent) => agent.agent_code));
+  const { data: agentRow, error: agentError } = await adminSupabase
+    .from("agents")
+    .upsert(
+      {
+        profile_id: profileRow.id,
+        agent_code: agentCode,
+        sponsor_agent_id: parsed.data.sponsor_agent_id || null,
+        team_number: teamAssignment.agentTeamNumber,
+        team_position: teamAssignment.agentTeamPosition,
+        status: parsed.data.status === "inactive" ? "inactive" : "active",
+        start_date: new Date().toISOString().slice(0, 10),
+      },
+      { onConflict: "profile_id" },
+    )
+    .select("*")
+    .single<Agent>();
+
+  if (agentError || !agentRow) {
+    return { ok: false, message: agentError?.message ?? "Unable to save agent record." };
+  }
+
+  if (teamAssignment.teamId && parsed.data.sponsor_agent_id) {
+    const { error: memberError } = await adminSupabase.from("team_members").upsert(
+      {
+        team_id: teamAssignment.teamId,
+        agent_id: agentRow.id,
+        sponsor_agent_id: parsed.data.sponsor_agent_id,
+        active_recruit_status: false,
+      },
+      { onConflict: "team_id,agent_id" },
+    );
+
+    if (memberError) return { ok: false, message: memberError.message };
+  }
+
+  await writeAuditLog(adminSupabase, profile, {
+    action: "agent.create",
+    entityType: "profile",
+    entityId: profileRow.id,
+    summary: `${profile.full_name} created agent profile ${parsed.data.full_name}.`,
+    metadata: {
+      agent_id: agentRow.id,
+      agent_code: agentCode,
+      manager_id: parsed.data.manager_id || null,
+      sponsor_agent_id: parsed.data.sponsor_agent_id || null,
+      status: parsed.data.status,
+    },
+  });
+
+  revalidateAgentManagementPaths();
+  return { ok: true, message: `${parsed.data.full_name} was added to Agents.`, data: { profile: profileRow, agent: agentRow } };
+}
+
+export async function updateAgentProfileAction(input: unknown): Promise<ActionResult> {
+  const parsed = UpdateAgentProfileInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid agent profile to update." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (!(await currentProfileHasPermission(supabase, profile, "agents.manage"))) {
+    return { ok: false, message: "You do not have permission to manage agents." };
+  }
+
+  let adminSupabase: SupabaseClient;
+  try {
+    adminSupabase = createAdminClient();
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Supabase admin client is not configured." };
+  }
+
+  const managerCheck = await validateManagerAssignment(adminSupabase, parsed.data.manager_id ?? null);
+  if (!managerCheck.ok) return managerCheck;
+
+  const { data: existingProfile, error: profileLookupError } = await adminSupabase
+    .from("profiles")
+    .select("*")
+    .eq("id", parsed.data.profile_id)
+    .maybeSingle<Profile>();
+
+  if (profileLookupError) return { ok: false, message: profileLookupError.message };
+  if (!existingProfile || existingProfile.role !== "agent") {
+    return { ok: false, message: "Agent profile was not found." };
+  }
+
+  const { data: existingAgent, error: agentLookupError } = await adminSupabase
+    .from("agents")
+    .select("*")
+    .eq("id", parsed.data.agent_id)
+    .eq("profile_id", parsed.data.profile_id)
+    .maybeSingle<Agent>();
+
+  if (agentLookupError) return { ok: false, message: agentLookupError.message };
+  if (!existingAgent) {
+    return { ok: false, message: "Agent record was not found." };
+  }
+
+  const sponsorAgentId = parsed.data.sponsor_agent_id ?? null;
+  if (sponsorAgentId === existingAgent.id) {
+    return { ok: false, message: "An agent cannot sponsor themselves." };
+  }
+
+  if (existingProfile.user_id) {
+    const updatedUser = await adminSupabase.auth.admin.updateUserById(existingProfile.user_id, {
+      email: parsed.data.email,
+      user_metadata: { full_name: parsed.data.full_name },
+    });
+
+    if (updatedUser.error) return { ok: false, message: updatedUser.error.message };
+  }
+
+  const { error: profileError } = await adminSupabase
+    .from("profiles")
+    .update({
+      full_name: parsed.data.full_name,
+      email: parsed.data.email,
+      phone: parsed.data.phone || null,
+      status: parsed.data.status,
+      manager_id: parsed.data.manager_id ?? null,
+      role: "agent",
+    })
+    .eq("id", parsed.data.profile_id);
+
+  if (profileError) return { ok: false, message: profileError.message };
+
+  let teamNumber = existingAgent.team_number;
+  let teamPosition = existingAgent.team_position;
+  let teamId: string | null = null;
+  const sponsorChanged = sponsorAgentId !== existingAgent.sponsor_agent_id;
+
+  if (sponsorChanged) {
+    const teamAssignment = await resolveTeamAssignment(adminSupabase, sponsorAgentId);
+    teamNumber = teamAssignment.agentTeamNumber;
+    teamPosition = teamAssignment.agentTeamPosition;
+    teamId = teamAssignment.teamId;
+    await adminSupabase.from("team_members").delete().eq("agent_id", existingAgent.id);
+  }
+
+  const { data: updatedAgent, error: agentError } = await adminSupabase
+    .from("agents")
+    .update({
+      agent_code: parsed.data.agent_code,
+      sponsor_agent_id: sponsorAgentId,
+      team_number: teamNumber,
+      team_position: teamPosition,
+      status: parsed.data.agent_status,
+      start_date: normalizeDateOnly(parsed.data.start_date) ?? new Date().toISOString().slice(0, 10),
+    })
+    .eq("id", existingAgent.id)
+    .select("*")
+    .single<Agent>();
+
+  if (agentError || !updatedAgent) {
+    return { ok: false, message: agentError?.message ?? "Unable to update agent record." };
+  }
+
+  if (sponsorChanged && teamId && sponsorAgentId) {
+    const { error: memberError } = await adminSupabase.from("team_members").upsert(
+      {
+        team_id: teamId,
+        agent_id: existingAgent.id,
+        sponsor_agent_id: sponsorAgentId,
+        active_recruit_status: false,
+      },
+      { onConflict: "team_id,agent_id" },
+    );
+
+    if (memberError) return { ok: false, message: memberError.message };
+  }
+
+  await writeAuditLog(adminSupabase, profile, {
+    action: "agent.update",
+    entityType: "profile",
+    entityId: parsed.data.profile_id,
+    summary: `${profile.full_name} updated agent profile ${parsed.data.full_name}.`,
+    metadata: {
+      agent_id: existingAgent.id,
+      agent_code: parsed.data.agent_code,
+      status: parsed.data.status,
+      agent_status: parsed.data.agent_status,
+      manager_id: parsed.data.manager_id ?? null,
+      sponsor_agent_id: sponsorAgentId,
+    },
+  });
+
+  revalidateAgentManagementPaths();
+  return { ok: true, message: `${parsed.data.full_name} was updated.`, data: updatedAgent };
+}
+
+export async function deleteAgentProfileAction(input: unknown): Promise<ActionResult> {
+  const parsed = DeleteAgentProfileInput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid agent profile to delete." };
+  }
+
+  const { supabase, profile } = await getSessionContext();
+  if (!(await currentProfileHasPermission(supabase, profile, "agents.manage"))) {
+    return { ok: false, message: "You do not have permission to manage agents." };
+  }
+
+  if (parsed.data.profile_id === profile.id) {
+    return { ok: false, message: "You cannot delete your own profile while signed in." };
+  }
+
+  let adminSupabase: SupabaseClient;
+  try {
+    adminSupabase = createAdminClient();
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Supabase admin client is not configured." };
+  }
+
+  const { data: profileToDelete, error: profileError } = await adminSupabase
+    .from("profiles")
+    .select("*")
+    .eq("id", parsed.data.profile_id)
+    .maybeSingle<Profile>();
+
+  if (profileError) return { ok: false, message: profileError.message };
+  if (!profileToDelete || profileToDelete.role !== "agent") {
+    return { ok: false, message: "Agent profile was not found." };
+  }
+
+  const { data: agent } = await adminSupabase
+    .from("agents")
+    .select("*")
+    .eq("profile_id", parsed.data.profile_id)
+    .maybeSingle<Agent>();
+  const blockers = await getAgentDeleteBlockers(adminSupabase, parsed.data.profile_id, agent?.id ?? null);
+  const blockerTotal = Object.values(blockers).reduce((total, value) => total + value, 0);
+
+  if (blockerTotal > 0) {
+    await adminSupabase.from("profiles").update({ status: "inactive" }).eq("id", parsed.data.profile_id);
+    if (agent?.id) {
+      await adminSupabase.from("agents").update({ status: "inactive" }).eq("id", agent.id);
+    }
+
+    await writeAuditLog(adminSupabase, profile, {
+      action: "agent.deactivate",
+      entityType: "profile",
+      entityId: parsed.data.profile_id,
+      summary: `${profile.full_name} deactivated ${profileToDelete.full_name} instead of deleting records with CRM history.`,
+      metadata: { agent_id: agent?.id ?? null, blockers },
+    });
+
+    revalidateAgentManagementPaths();
+    return {
+      ok: true,
+      message: `${profileToDelete.full_name} has CRM history, so the profile was safely deactivated instead of hard-deleted.`,
+      data: { deactivated: true, blockers },
+    };
+  }
+
+  if (profileToDelete.user_id) {
+    const deletedUser = await adminSupabase.auth.admin.deleteUser(profileToDelete.user_id);
+    if (deletedUser.error) return { ok: false, message: deletedUser.error.message };
+  } else {
+    const { error: deleteError } = await adminSupabase.from("profiles").delete().eq("id", parsed.data.profile_id);
+    if (deleteError) return { ok: false, message: deleteError.message };
+  }
+
+  await writeAuditLog(adminSupabase, profile, {
+    action: "agent.delete",
+    entityType: "profile",
+    entityId: parsed.data.profile_id,
+    summary: `${profile.full_name} deleted agent profile ${profileToDelete.full_name}.`,
+    metadata: { agent_id: agent?.id ?? null },
+  });
+
+  revalidateAgentManagementPaths();
+  return { ok: true, message: `${profileToDelete.full_name} was deleted.`, data: { deleted: true } };
 }
 
 export async function bulkAssignProfilesToManagerAction(input: unknown): Promise<ActionResult> {
@@ -2579,6 +2991,99 @@ function toIsoOrNull(value?: string | null) {
 async function getCurrentAgentId(supabase: SupabaseClient, profileId: string) {
   const { data } = await supabase.from("agents").select("id").eq("profile_id", profileId).maybeSingle<{ id: string }>();
   return data?.id ?? null;
+}
+
+async function currentProfileHasPermission(supabase: SupabaseClient, profile: Profile, permissionKey: PermissionKey) {
+  const { data, error } = await supabase.from("role_permissions").select("*").returns<RolePermission[]>();
+  if (error) {
+    console.warn("Role permissions are not available yet.", error.message);
+    return hasPermission(profile.role, [], permissionKey);
+  }
+
+  return hasPermission(profile.role, data ?? [], permissionKey);
+}
+
+async function validateManagerAssignment(supabase: SupabaseClient, managerId: string | null): Promise<ActionResult> {
+  if (!managerId) return { ok: true, message: "No manager assignment needed." };
+
+  const { data: manager, error } = await supabase
+    .from("profiles")
+    .select("id,role")
+    .eq("id", managerId)
+    .maybeSingle<{ id: string; role: string }>();
+
+  if (error) return { ok: false, message: error.message };
+  if (!manager || !["manager", "admin"].includes(manager.role)) {
+    return { ok: false, message: "Choose a manager or admin for the manager assignment." };
+  }
+
+  return { ok: true, message: "Manager assignment is valid." };
+}
+
+async function getAgentDeleteBlockers(supabase: SupabaseClient, profileId: string, agentId: string | null) {
+  const [
+    assignedTasks,
+    uploadedDocuments,
+    processorConnections,
+    onboardingRecords,
+    merchants,
+    deals,
+    merchantUpdates,
+    residuals,
+    teamsLed,
+    teamMemberships,
+    sponsoredAgents,
+    sponsoredTeamMembers,
+    payrollAdjustments,
+  ] = await Promise.all([
+    countTableRows(supabase, "tasks", "assigned_to", profileId),
+    countTableRows(supabase, "documents", "uploaded_by", profileId),
+    countTableRows(supabase, "processor_connections", "agent_profile_id", profileId),
+    countTableRows(supabase, "agent_onboarding_records", "profile_id", profileId),
+    agentId ? countTableRows(supabase, "merchants", "assigned_agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "deals", "agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "merchant_updates", "agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "residuals", "agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "teams", "leader_agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "team_members", "agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "agents", "sponsor_agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "team_members", "sponsor_agent_id", agentId) : Promise.resolve(0),
+    agentId ? countTableRows(supabase, "payroll_adjustments", "agent_id", agentId) : Promise.resolve(0),
+  ]);
+
+  return {
+    assigned_tasks: assignedTasks,
+    uploaded_documents: uploadedDocuments,
+    processor_connections: processorConnections,
+    onboarding_records: onboardingRecords,
+    merchants,
+    deals,
+    merchant_updates: merchantUpdates,
+    residuals,
+    teams_led: teamsLed,
+    team_memberships: teamMemberships,
+    sponsored_agents: sponsoredAgents,
+    sponsored_team_members: sponsoredTeamMembers,
+    payroll_adjustments: payrollAdjustments,
+  };
+}
+
+async function countTableRows(supabase: SupabaseClient, table: string, column: string, value: string) {
+  const { count, error } = await supabase.from(table).select("id", { count: "exact", head: true }).eq(column, value);
+  if (error) {
+    console.warn(`Unable to count ${table}.${column} dependencies.`, error.message);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
+function revalidateAgentManagementPaths() {
+  revalidatePath("/agents");
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/teams");
+  revalidatePath("/analytics");
 }
 
 async function loadProcessorPricingSettings(supabase: SupabaseClient) {
